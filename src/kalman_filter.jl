@@ -434,6 +434,21 @@ function diffuse_kalman_filter_init!(Y::AbstractArray{X},
     return t
 end
 
+get_updated_a!(va1, va, vKstar, vv)
+get_updated_Pstartt!(vPstartt, vPstar, vZPstar, vKstar, ws,Ptmp)
+function get_updated_Pstartt!(vPstartt, vPstar, vZPstar, vKstar, ws.Ptmp)
+    mul!(ws.Ptmp, transpose(vKstar), vFstar)
+    copy!(vPstartt, vPstar)
+    mul!(vPstartt, vKstart, ws.Ptmp, 1.0, -1.0)
+end
+
+               
+function update_a_Finfnull()
+    mul!(temp1, viFstar, vv)
+    copy!(va1, va)
+    mul!(va1, vKstar, temp1, 1.0, 1.0)
+end
+
 function diffuse_kalman_filter!(Y::AbstractArray{X},
                                 c::AbstractArray{U},
                                 Z::AbstractArray{W},
