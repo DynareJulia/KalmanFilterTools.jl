@@ -464,12 +464,21 @@ function get_updated_Pstartt!(vPstartt, vPstar, vZPstar, vKstar, ws.Ptmp)
     copy!(vPstartt, vPstar)
     mul!(vPstartt, vKstart, ws.Ptmp, 1.0, -1.0)
 end
-
                
 function update_a_Finfnull()
-    mul!(temp1, viFstar, vv)
-    copy!(va1, va)
-    mul!(va1, vKstar, temp1, 1.0, 1.0)
+    # Fstar  = Z*Pstar*Z' + H;                                        %(5.7) DK(2012)
+    get_F!(vFstar, vZPstar, vZsmall, vPstar, vH)
+    info = get_cholF!(vcholF, vFstar)
+    if info 
+        throw(ErrorException("vFstar is singular"))
+    end
+    # Kstar = iFstar*Z*Pstar
+    get_K!(vKstar, vZPstar, vcholF)
+    # att = a + Kstar*v                                                (5.15) DK(2012)
+    get_updated_a!(vatt, va, vKinf, vv)
+    # a1 = d + T*att                                                  (5.13) DK(2012) 
+    update_a!(va1, vd, vT, vatt)
+
 end
 
 function diffuse_kalman_filter!(Y::AbstractArray{X},
