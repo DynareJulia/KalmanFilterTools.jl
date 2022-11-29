@@ -400,6 +400,7 @@ function diffuse_kalman_filter_init!(Y::AbstractArray{X},
                     cholHset = true
                 end
                 ws.lik[t] += ndata*l2pi + univariate_step(vatt, va1, vPinftt, vPinf1, vPstartt, vPstar1, Y, t, vc, vZsmall, vvH, vd, vT, ws.QQ, va, vPinf, vPstar, diffuse_kalman_tol, kalman_tol, ws, pattern)
+                break
             end
         else
             ws.lik[t] = ndata*l2pi + log(det_from_cholesky(vcholF))
@@ -414,20 +415,20 @@ function diffuse_kalman_filter_init!(Y::AbstractArray{X},
             get_Kstar!(vKstar, vZsmall, vPstar, vFstar, vKinf, vcholF)
             # att = a + Kinf*v                                                (5.13) DK(2012)
             get_updated_a!(vatt, va, vKinf, vv)
-            # a1 = d + T*att                                                  (5.13) DK(2012) 
-            update_a!(va1, vd, vT, vatt)
             # Pinf_tt = Pinf - Kinf'*Z*Pinf                                    %(5.14) DK(2012)
             get_updated_Ptt!(vPinftt, vPinf, vKinf, vZPinf)
-            # Pinf = T*Ptt*T'
-            update_P!(vPinf1, vT, vPinftt, ws.PTmp)
             # Pstartt = Pstar-Pstar*Z'*Kinf-Pinf*Z'*Kstar                           %(5.14) DK(2012)
             get_updated_Pstartt!(vPstartt, vPstar, vZPstar, vKinf, vZPinf,
                                  vKstar, vPinftt, ws.PTmp)
-            # Pstar = T*Pstartt*T' + QQ
-            update_P!(vPstar1, vT, vPstartt, ws.QQ, ws.PTmp)
-            if norm(vPinf1) < tol
-                return t
-            end
+        end
+        # a1 = d + T*att                                                  (5.13) DK(2012) 
+        update_a!(va1, vd, vT, vatt)
+        # Pinf = T*Ptt*T'
+        update_P!(vPinf1, vT, vPinftt, ws.PTmp)
+        # Pstar = T*Pstartt*T' + QQ
+        update_P!(vPstar1, vT, vPstartt, ws.QQ, ws.PTmp)
+        if norm(vPinf1) < tol
+            return t
         end
         t += 1
     end
@@ -437,9 +438,10 @@ end
 get_updated_a!(va1, va, vKstar, vv)
 get_updated_Pstartt!(vPstartt, vPstar, vZPstar, vKstar, ws,Ptmp)
 function get_updated_Pstartt!(vPstartt, vPstar, vZPstar, vKstar, ws.Ptmp)
+    # Pstartt = Pstar - Z'Kinf                                      (5.12) DK(2012)
     mul!(ws.Ptmp, transpose(vKstar), vFstar)
     copy!(vPstartt, vPstar)
-    mul!(vPstartt, vKstart, ws.Ptmp, 1.0, -1.0)
+    mul!(vPstartt, vKstar, ws.Ptmp, 1.0, -1.0)
 end
                
 function update_a_Finfnull()
@@ -455,8 +457,15 @@ function update_a_Finfnull()
     get_updated_a!(vatt, va, vKinf, vv)
     # a1 = d + T*att                                                  (5.13) DK(2012) 
     update_a!(va1, vd, vT, vatt)
-
 end
+
+function update_Pinf_Finfnull()
+    # Pinf = T*Pinf*T'
+    update_P!(Pinf1, T, Pinftt, Ptmp)
+end
+
+function update_Pstar_Finfnull()
+    # Pstar = T*P_star*(T - Kinf*Z)' + R*Q*R'
 
 function diffuse_kalman_filter!(Y::AbstractArray{X},
                                 c::AbstractArray{U},
