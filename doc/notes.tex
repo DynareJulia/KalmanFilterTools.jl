@@ -43,8 +43,8 @@ When $F^{-1}_{\infty,t}$ is regular
   K^{(0)}_t &= T_tM_{\infty,t}F^{(1)}_t & \mbox{(DK2012 5.12)}\\
   K^{(1)}_t &= T_tM_{\star,t}F^{(1)}_t + T_tM_{\infty,t}F^{(2)}_t &
                                                                     \mbox{(DK2012 5.12)}\\
-  L^{(0}_t &= T_t - K^{(0)}_tZ_t & \mbox{(DK2012 5.12)}\\
-  L^{(1}_t &= - K^{(1)}_tZ_t & \mbox{(DK2012 5.12)}\\
+  L^{(0)}_t &= T_t - K^{(0)}_tZ_t & \mbox{(DK2012 5.12)}\\
+  L^{(1)}_t &= - K^{(1)}_tZ_t & \mbox{(DK2012 5.12)}\\
   a^{(0)}_{t|t} &= a^{(0)}_t + M_{\infty,t}F^{(1)}_t\nu^{(0)}_t\\
   P_{\infty,t|t} &= P_{\infty,t} - P_{\infty,t}Z'_tF^{(1)}_tM_{\infty,t}' \\
   P_{\star,t|t} &= P_{\star,t} - P_{\star,t}Z'_t
@@ -62,7 +62,7 @@ When $F^{-1}_{\infty,t} = \mathbf{0}$
   a^{(0)}_{t|t} &= a^{(0)}_t + M_{\star,t}F^{-1}_{\star,t}\nu^{(0)}_t\\
   P_{\infty,t|t} &= P_{\infty,t} \\
   P_{\star,t|t} &= P_{\star,t} - P_{\star,t}Z'_t
-                  F^{-1}_{\star,t}Z_tP_{\star,t} \\
+                  F^{-1}_{\star,t}Z_t \\
   a^{(0)}_{t+1} &= T_ta^{(0)}_t + K^{(0)}_t\nu^{(0)}_t & \mbox{(DK2012 
                                                          p. 129)}\\
   P_{\infty,t+ 1} &= T_tP_{\infty,t}T'_t & \mbox{(DK2012 5.14)}\\
@@ -84,27 +84,25 @@ algorithm is
 \end{align*}
 When $F^{-1}_{\infty,t}$ is regular
 \begin{align*}
-  \tilde K_{\infty,t} &= F^{(1)}_t(ZP_{\infty}) \\
-  \tilde K_{\star,t} &=  F^{(1)}_t((ZP_{\star}) + F_{\star,t}K_{\infty,t}) \\
-  a_{t|t} &= a_t + K_{\infty,t}'\nu_t\\
-  P_{\infty,t|t} &= P_{\infty,t} - \tilde K'_{\infty,t}(ZP_{\infty}) \\
-  P_{\star,t|t} &= P_{\star,t} - (ZP_{\star})'\tilde K_{\infty,t}
-                  - (ZP_{\infty})'\tilde K_{\star,t}\\
+  \tilde K_{\infty,t} &= F^{-1}_{\infty,t}(ZP_{\infty,t}) \\
+  \tilde K_{\star,t} &=  F^{-1}_{\infty,t}((ZP_{\star,t}) - F_{\star,t}K_{\infty,t}) \\
+  a_{t|t} &= a_t + \tilde K_{\infty,t}'\nu_t\\
+  P_{\infty,t|t} &= P_{\infty,t} - \tilde K'_{\infty,t}(ZP_{\infty,t}) \\
+  P_{\star,t|t} &= P_{\star,t} - \tilde K_{\infty,t}'ZP_{\star,t}
+                  - \tilde K_{\star,t}ZP_{\infty,t}\\
   a_{t+1} &= d_t + T_ta_{t|t} \\
-  P_{\infty,t+ 1} &= T_tP_{\infty,t}T'_t\\
+  P_{\infty,t+ 1} &= T_tP_{\infty,t|t}T'_t\\
   P_{\star, t+1} &= T_tP_{\star,t|t}T'_t + R_tQ_tR_t'
 \end{align*}
 When $F^{-1}_{\infty,t} = \mathbf{0}$
 \begin{align*}
-  K_{\infty,t}^{(0)} &= T_tM_{\star,t}F^{-1}_{\star,t}& \mbox{(DK2012 5.15)}\\
-  a_{t|t} &= a_t + K^{-1}_{\infty,t}\nu^{(0)}_t\\
+  \tilde K_{\star,t} &= F^{-1}_{\star,t}(ZP_{\star,t})\\
+  a_{t|t} &= a_t + K'_{\star,t}\nu^{(0)}_t\\
   P_{\infty,t|t} &= P_{\infty,t} \\
-  P_{\star,t|t} &= P_{\star,t} - P_{\star,t}Z'_t
-                  F^{-1}_{\star,t}Z_tP_{\star,t} \\
-  a^{(0)}_{t+1} &= T_ta^{(0)}_t + K^{(0)}_t\nu^{(0)}_t & \mbox{(DK2012 
-                                                         p. 129)}\\
-  P_{\infty,t+ 1} &= T_tP_{\infty,t}T'_t & \mbox{(DK2012 5.14)}\\
-  P_{\star, t+1} &= T_tP_{\star,t}L^{(0)'}_t + R_tQ_tR_t' & \mbox{(DK2012 5.17).}
+  P_{\star,t|t} &= P_{\star,t} - \tilde K_{\infty,t}'ZP_{\star,t}\\
+  a^{(0)}_{t+1} &= d_t + T_ta_{t|t}\\
+  P_{\infty,t+ 1} &= T_tP_{\infty,t|t}T'_t \\
+  P_{\star, t+1} &= T_tP_{\star,t|t}T'_t + R_tQ_tR_t' 
 \end{align*}
 
 \section{Basic smoother}
