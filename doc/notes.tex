@@ -57,12 +57,12 @@ When $F^{-1}_{\infty,t}$ is regular
 When $F^{-1}_{\infty,t} = \mathbf{0}$
 \begin{align*}
   K^{(0)}_t &= T_tM_{\star,t}F^{-1}_{\star,t}& \mbox{(DK2012 5.15)}\\
-  L^{(0}_t &= T_t - K^{(0)}_tZ_t & \mbox{(DK2012 5.12)}\\
-  L^{(1}_t &= - K^{(1)}_tZ_t & \mbox{(DK2012 5.12)}\\
+  L^{(0)}_t &= T_t - K^{(0)}_tZ_t & \mbox{(DK2012 5.12)}\\
+  L^{(1)}_t &= - K^{(1)}_tZ_t & \mbox{(DK2012 5.12)}\\
   a^{(0)}_{t|t} &= a^{(0)}_t + M_{\star,t}F^{-1}_{\star,t}\nu^{(0)}_t\\
   P_{\infty,t|t} &= P_{\infty,t} \\
   P_{\star,t|t} &= P_{\star,t} - P_{\star,t}Z'_t
-                  F^{-1}_{\star,t}Z_t \\
+                  F^{-1}_{\star,t}Z_t P_{\star,t}\\
   a^{(0)}_{t+1} &= T_ta^{(0)}_t + K^{(0)}_t\nu^{(0)}_t & \mbox{(DK2012 
                                                          p. 129)}\\
   P_{\infty,t+ 1} &= T_tP_{\infty,t}T'_t & \mbox{(DK2012 5.14)}\\
@@ -85,7 +85,8 @@ algorithm is
 When $F^{-1}_{\infty,t}$ is regular
 \begin{align*}
   \tilde K_{\infty,t} &= F^{-1}_{\infty,t}(ZP_{\infty,t}) \\
-  \tilde K_{\star,t} &=  F^{-1}_{\infty,t}((ZP_{\star,t}) - F_{\star,t}K_{\infty,t}) \\
+  \tilde K_{\star,t} &=  F^{-1}_{\infty,t}((ZP_{\star,t}) -
+                       F_{\star,t}\tilde K_{\infty,t}) \\
   a_{t|t} &= a_t + \tilde K_{\infty,t}'\nu_t\\
   P_{\infty,t|t} &= P_{\infty,t} - \tilde K'_{\infty,t}(ZP_{\infty,t}) \\
   P_{\star,t|t} &= P_{\star,t} - \tilde K_{\infty,t}'ZP_{\star,t}
