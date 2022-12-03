@@ -23,8 +23,8 @@ end
 
 function get_cholF!(cholF::AbstractArray{T}, F::AbstractArray{T}) where T <: AbstractFloat
     cholF .= 0.5.*(F .+ transpose(F))
-    info = LAPACK.potrf!('U', cholF)
-    return info[2]
+    cholF, info = LAPACK.potrf!('U', cholF)
+    return info
 end
 
 # D = inv(F_t) + K_t*T*N_t*T'*K_t'
