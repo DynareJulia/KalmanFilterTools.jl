@@ -88,9 +88,6 @@ function kalman_likelihood(Y::AbstractMatrix{X},
         # F  = Z*P*Z' + H
         get_F!(ws.F, ws.ZP, Z, P, H)
         info = get_cholF!(ws.cholF, ws.F)
-        if t <= start + 6
-            @show t, det(ws.F), info
-        end
         if info != 0
             # F is near singular
             if !cholHset
@@ -98,7 +95,6 @@ function kalman_likelihood(Y::AbstractMatrix{X},
                 cholHset = true
             end
             ws.lik[t] = univariate_step!(Y, t, Z, H, T, ws.QQ, a, P, ws.kalman_tol, ws)
-            t <= start + 5 && @show ws.lik[t]
         else
             # iFv = inv(F)*v
             get_iFv!(ws.iFv, ws.cholF, ws.v)

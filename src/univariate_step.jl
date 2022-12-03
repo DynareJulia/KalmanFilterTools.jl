@@ -49,9 +49,6 @@ function univariate_step!(Y, t, Z, H, T, RQR, a, P, kalman_tol, ws)
             # P = P - PZi*PZi'/F
             ger!(-1.0/F, ws.PZi, ws.PZi, P)
             llik += log(F) + v*v/F
-            if t <= 6
-                @show v, F, ws.PZi[i], a[i], P[i,i]
-            end
         end
     end
     mul!(ws.a1, T, a)
@@ -252,9 +249,6 @@ function univariate_step!(att, a1, Ptt, P1, Y, t, c, Z, H, d, T, RQR, a, P, kalm
             # P = P - PZi*PZi'/F
             ger!(-1.0/F, ws.PZi, ws.PZi, Ptt)
             llik += log(F) + v*v/F
-            if t <=  6
-                @show v, F, ws.PZi[i], a[i], P[i, i]
-            end
         end
     end
     copy!(a1, d)
