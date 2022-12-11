@@ -42,7 +42,6 @@ s = zeros(ns)
 
     t_init!(H, P, s, H_0, P_0, s_0)
     llk_1 = kalman_likelihood(y, Z, H, T, R, Q, s, P, 1, nobs, 0, ws1)
-
     h5open("$path/reference/kalman_filter_out.h5", "r") do h5
         @test read(h5, "log_likelihood") ≈ llk_1
     end
@@ -55,6 +54,7 @@ s = zeros(ns)
     llk_2 = kalman_likelihood(y, Z, H, T, R, Q, s, P, 1, nobs, 0, ws1, full_data_pattern)
     @test llk_2 ≈ llk_1
 
+    
     t_init!(H, P, s, H_0, P_0, s_0)
     llk_2 = kalman_likelihood_monitored(y, Z, H, T, R, Q, s, P, 1, nobs, 0, ws1, full_data_pattern)
     @test llk_2 ≈ llk_1
@@ -109,8 +109,6 @@ end
     Z_1[1, 1] -= sqrt(P_0[1,1])
     Z_1[2, 2] -= sqrt(P_0[2,2])
     Z_1[3, 3] -= sqrt(P_0[3,3])
-    @show det(Z_1*P_0*Z_1' + H) 
-
     
     ws1 = KalmanLikelihoodWs(ny, ns, np, nobs)
     ws2 = KalmanFilterWs(ny, ns, np, nobs)
@@ -122,14 +120,12 @@ end
     
     t_init!(H, P, s, H_1, P_0, s_0)
     llk_1 = kalman_filter!(y, zeros(ny), Z_1, H, zeros(ns), T, R, Q, s, stt, P, Ptt, 1, nobs, 0, ws2, full_data_pattern)
-    @show ws2.lik[1:5] .- ny*log(2*pi)
 
     P = zeros(ns, ns)
     s = zeros(ns)
     t_init!(H, P, s, H_1, P_0, s_0)
     
     llk_2 = kalman_likelihood(y, Z_1, H, T, R, Q, s, P, 1, nobs, 0, ws1)
-    @show ws1.lik[1:5]
     @test llk_2  ≈ llk_1
      
     t_init!(H, P, s, H_1, P_0, s_0)
@@ -155,7 +151,6 @@ end
     Z_1 = copy(Z)
     Z_1[3, :] = Z[1, :] + Z[2, :]
     H_1 = Z_1*P_0*Z_1'
-    @show det(Z_1*P_0*Z_1' + H_1) 
     
     ws1 = KalmanLikelihoodWs(ny, ns, np, nobs)
     ws2 = KalmanFilterWs(ny, ns, np, nobs)
@@ -231,6 +226,7 @@ end
     llk_2 = kalman_likelihood(y, z, H, T, R, Q, s, P, 1, nobs, 0, ws1)
     @test llk_1 ≈ llk_2
 
+    t_init!(H, P, s, H_0, P_0, s_0)
     llk_2 = kalman_likelihood(y, z, H, T, R, Q, s, P, 1, nobs, 0, ws1, full_data_pattern)
     @test llk_1 ≈ llk_2
 
@@ -368,8 +364,6 @@ full_data_pattern = [collect(1:ny) for o = 1:nobs]
     @test llk_3 ≈ -0.5*sum(ws5.lik[1:t1])
     @test aa[:, t1 + 1] ≈ vars["a"]
     @test PPstar[:, :, t1 + 1] ≈ vars["Pstar1"]
-    display(PPstar[:,:,t1+1])
-    display(vars["Pstar1"])
     z = [4, 3]
     a = copy(a_0)
     Pinf = copy(Pinf_0)
@@ -503,6 +497,114 @@ full_data_pattern = [collect(1:ny) for o = 1:nobs]
                                       1e-8, ws6)
     @test llk_6b ≈ llk_4 
     @test Y ≈ alphah[z, :]
+end
+
+@testset "update functions with regular F and F == 0" begin
+    Z = vars["Z"]
+    T = vars["T"]
+    R = vars["R"]
+    Q = vars["Q"]
+    Pinf_0 = vars["Pinf"]
+    Pstar_0 = vars["Pstar"]
+
+    ns = size(Pinf_0, 1)
+    ny = size(Z, 1)
+
+    
+    #Inputs
+    v        = zeros(ny)
+    c        = zeros(ny)
+    Zsmall   = Z
+    a        = zeros(ns)
+    # v  = Y[:,t] - c - Z*a
+    KalmanFilterTools.get_v!(v, Y, c, Zsmall, a, 1, collect(1:2))
+    ZPinf    = zeros(ny, ns)
+    Finf     = zeros(ny, ny)
+    # Finf = Z*Pinf*Z'
+    KalmanFilterTools.get_F!(Finf, ZPinf, Zsmall, Pinf_0)
+    cholF    = zeros(ny, ny)
+    KalmanFilterTools.get_cholF!(cholF, Finf)
+    Pstar   = copy(Pstar_0)
+    H = zeros(ny, ny)
+    Pinf = copy(Pinf_0)
+
+    #Outputs
+    K0     = zeros(ny, ns)
+    ZPstar   = similar(ZPinf)
+    Fstar    = zeros(ny, ny)
+    K1    = similar(K0)
+    att      = similar(a)
+    Pinftt   = similar(Pinf_0)
+    Pstartt  = similar(Pstar_0)
+    PTmp     = similar(Pstar_0)
+        
+    KalmanFilterTools.get_updated_Finfnonnull!(att,     
+                                             Pinftt,  
+                                             Pstartt, 
+                                             ZPinf,   
+                                             ZPstar,  
+                                             cholF,   
+                                             Fstar,   
+                                             Zsmall,  
+                                             Pstar,   
+                                             H,       
+                                             K0,    
+                                             K1,   
+                                             a,       
+                                             v,       
+                                             Pinf,    
+                                             PTmp)
+    # K0   = iFinf*Z*Pinf
+    K0_2 = (ZPinf*Z')\ZPinf
+    Fstar_2 = ZPstar*Z' + H
+    # K1  = iFinf*(Z*Pstar - Fstar*K0)
+    K1_2 = Finf\(ZPstar - Fstar_2*K0)
+    att2 = a + K0'*v                  
+    # Pinf_tt = Pinf - Kinf'*Z*Pinf           
+    Pinftt2 = Pinf - K0'*ZPinf
+    # Pstartt = Pstar-Pstar*Z'*Kinf-Pinf*Z'*Kstar
+    Pstartt2 = Pstar - ZPstar'*K0 - ZPinf'*K1_2
+
+    @test K0_2 ≈ K0
+    @test Fstar_2 ≈ Fstar
+    @test K1_2 ≈ K1
+    @test att2 ≈ att
+    @test Pinftt2 ≈ Pinftt
+    @test Pstartt2 ≈ Pstartt
+
+    Pstar = T*Pstartt*T'
+    KalmanFilterTools.get_updated_Finfnull2!(att,
+                                            Pinftt,
+                                            Pstartt,
+                                            ZPinf,
+                                            ZPstar,
+                                            cholF,
+                                            Fstar,
+                                            Zsmall,
+                                            Pstar,
+                                            H,
+                                            K0,
+                                            a,
+                                            v,
+                                            Pinf,
+                                            1e-12)
+    # K0   = iFsar*Z*Pstar
+    Fstar_2 = ZPstar*Z' + H
+    K0_2 = Fstar_2\ZPstar
+    att2 = a + K0'*v                  
+    # Pinf_tt = Pinf
+    Pinftt2 = Pinf
+    # Pstartt = Pstar*L0'
+    #         = Pstar*(I - Z'*inv(Fstar)*Z*Pstar)
+    #         = Pstar - K0_2'*ZPstar
+    Pstartt2 = Pstar - K0_2'*ZPstar
+    
+    @test K0_2 ≈ K0
+    @test Fstar_2 ≈ Fstar
+    @test K1_2 ≈ K1
+    @test att2 ≈ att
+    @test Pinftt2 ≈ Pinftt
+    @test isapprox(Pstartt2, Pstartt, atol = 1e-15)
 end
 
 @testset "start and last" begin

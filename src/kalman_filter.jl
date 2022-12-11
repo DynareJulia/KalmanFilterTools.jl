@@ -17,23 +17,16 @@ struct KalmanFilterWs{T, U} <: KalmanWs{T, U}
     r1::Vector{T}
     at_t::Matrix{T}
     K::Array{T}
-    KDK::Array{T}
-    L::Matrix{T}
-    L1::Matrix{T}
-    N::Matrix{T}
-    N1::Matrix{T}
     ZP::Matrix{T}
-    Kv::Matrix{T}
     iFZ::Matrix{T}
     PTmp::Matrix{T}
     oldP::Matrix{T}
     lik::Vector{T}
-    KT::Matrix{T}
     D::Matrix{T}
+    PZi::Vector{T}
     ystar::Vector{T}
     Zstar::Matrix{T}
     Hstar::Matrix{T}
-    PZi::Vector{T}
     tmp_np::Vector{T}
     tmp_ns::Vector{T}
     tmp_ny::Vector{T}
@@ -48,34 +41,27 @@ struct KalmanFilterWs{T, U} <: KalmanWs{T, U}
         iZsmall = Vector{U}(undef, ny)
         RQ = Matrix{T}(undef, ns, np)
         QQ = Matrix{T}(undef, ns, ns)
+        v = Matrix{T}(undef, ny, nobs)
         F = Matrix{T}(undef, ny, ny)
         cholF = Array{T}(undef, ny, ny, nobs)
         cholH = Matrix{T}(undef, ny, ny)
         iF = Array{T}(undef, ny, ny, nobs)
-        a1 = Vector{T}(undef, ns)
-        v = Matrix{T}(undef, ny, nobs)
         iFv = Array{T}(undef, ny)
+        a1 = Vector{T}(undef, ns)
         r = zeros(T, ns)
         r1 = zeros(T, ns)
         at_t = zeros(T, ns, nobs)
         K = Array{T}(undef, ny, ns, nobs)
-        KDK = Array{T}(undef, ns, ny, nobs)
-        L = Matrix{T}(undef, ns, ns)
-        L1 = Matrix{T}(undef, ns, ns)
-        N = zeros(T, ns, ns)
-        N1 = zeros(T, ns, ns)
-        Kv = Matrix{T}(undef, ns, nobs)
-        PTmp = Matrix{T}(undef, ns, ns)
-        oldP = Matrix{T}(undef, ns, ns)
         ZP = Matrix{T}(undef, ny, ns)
         iFZ = Matrix{T}(undef, ny, ns)
+        PTmp = Matrix{T}(undef, ns, ns)
+        oldP = Matrix{T}(undef, ns, ns)
         lik = Vector{T}(undef, nobs)
-        KT = Matrix{T}(undef, ny, ns)
         D = Matrix{T}(undef, ny, ny)
+        PZi = Vector{T}(undef, ns)
         ystar = Vector{T}(undef, ny)
         Zstar = Matrix{T}(undef, ny, ns)
         Hstar = Matrix{T}(undef, ny, ny)
-        PZi = Vector{T}(undef, ns)
         tmp_np = Vector{T}(undef, np)
         tmp_ns = Vector{T}(undef, ns)
         tmp_ny = Vector{T}(undef, ny)
@@ -85,10 +71,9 @@ struct KalmanFilterWs{T, U} <: KalmanWs{T, U}
         kalman_tol = 1e-12
 
         new(csmall, Zsmall, iZsmall, RQ, QQ, v, F, cholF, cholH, iF,
-            iFv, a1, r, r1, at_t, K, KDK, L, L1, N, N1, ZP, Kv,
-            iFZ, PTmp, oldP, lik, KT, D, ystar, Zstar, Hstar, PZi,
-            tmp_np, tmp_ns, tmp_ny, tmp_ns_np, tmp_ny_ny, tmp_ny_ns,
-            kalman_tol)
+            iFv, a1, r, r1, at_t, K, ZP, iFZ, PTmp, oldP, lik, D, PZi,
+            ystar, Zstar, Hstar, tmp_np, tmp_ns, tmp_ny, tmp_ns_np,
+            tmp_ny_ny, tmp_ny_ns, kalman_tol)
     end
 end
 
@@ -208,7 +193,7 @@ function kalman_filter!(Y::AbstractArray{X},
         # F  = Z*P*Z' + H
         get_F!(vF, vZP, vZsmall, vP, vvH)
         info = get_cholF!(vcholF, vF)
-        if info != 0
+        if rcond(vcholF) < ws.kalman_tol || info != 0
             # F is near singular
             if !cholHset
                 get_cholF!(vcholH, vvH)
@@ -217,12 +202,12 @@ function kalman_filter!(Y::AbstractArray{X},
             ws.lik[t] = ndata*l2pi + univariate_step!(vatt, va1, vPtt, vP1, Y, t, c, ws.Zsmall, vvH, d, T, ws.QQ, va, vP, ws.kalman_tol, ws, pattern)
             t += 1
             continue
-        end
+        end 
         # iFv = inv(F)*v
         get_iFv!(viFv, vcholF, vv)
         ws.lik[t] = ndata*l2pi + log(det_from_cholesky(vcholF)) + LinearAlgebra.dot(vv, viFv)
         # don't update in last period
-        if t < last
+        if t <= last
             full_update!(va1, va, vatt, vd, vcholF, vK, vP1, vP, vPtt, vT, vv, vZP, d, steady, ws)            
             if changeP && steady && t > 1
                 # steady state: covariances are just copied over 
@@ -254,19 +239,19 @@ struct DiffuseKalmanFilterWs{T, U} <: KalmanWs{T, U}
     ZP::Matrix{T}
     Fstar::Matrix{T}
     ZPstar::Matrix{T}
-    Kinf::Matrix{T}
+    K0::Matrix{T}
     iFZ::Matrix{T}
     K::Matrix{T}
     PTmp::Matrix{T}
     oldP::Matrix{T}
-    uKinf::Vector{T}
-    uKstar::Vector{T}
-    Kinf_Finf::Vector{T}
+    uK0::Vector{T}
+    uK1::Vector{T}
+    K0_Finf::Vector{T}
+    PZi::Vector{T}
+    lik::Vector{T}
     ystar::Vector{T}
     Zstar::Matrix{T}
     Hstar::Matrix{T}
-    PZi::Vector{T}
-    lik::Vector{T}
     kalman_tol::T
 
     function DiffuseKalmanFilterWs{T, U}(ny::U, ns::U, np::U, nobs::U) where {T <: AbstractFloat, U <: Integer}
@@ -286,23 +271,23 @@ struct DiffuseKalmanFilterWs{T, U} <: KalmanWs{T, U}
         ZP = Matrix{T}(undef, ny, ns)
         Fstar = Matrix{T}(undef, ny, ny)
         ZPstar = Matrix{T}(undef, ny, ns)
-        Kinf = Matrix{T}(undef, ny, ns)
+        K0 = Matrix{T}(undef, ny, ns)
         iFZ = Matrix{T}(undef, ny, ns)
         K = Matrix{T}(undef, ny, ns)
         PTmp = Matrix{T}(undef, ns, ns)
         oldP = Matrix{T}(undef, ns, ns)
-        uKinf = Vector{T}(undef, ns)
-        uKstar = Vector{T}(undef, ns)
-        Kinf_Finf = Vector{T}(undef, ns)
-        ystar = Vector{T}(undef, ny)
-        Zstar = Matrix{T}(undef, ny, ns)
-        Hstar = Matrix{T}(undef, ny, ny)
+        uK0 = Vector{T}(undef, ns)
+        uK1 = Vector{T}(undef, ns)
+        K0_Finf = Vector{T}(undef, ns)
         PZi = Vector{T}(undef, ns)
         lik = zeros(T, nobs)
         kalman_tol = 1e-12
-        new(csmall, Zsmall, iZsmall, QQ, RQ, c, v, F, iF, iFv, a1, cholF, cholH, ZP, Fstar,
-            ZPstar, Kinf, iFZ, K, PTmp, oldP, uKinf, uKstar, Kinf_Finf, ystar, Zstar, Hstar,
-            PZi, lik, kalman_tol)
+        ystar = Vector{T}(undef, ny)
+        Zstar = Matrix{T}(undef, ny, ns)
+        Hstar = Matrix{T}(undef, ny, ny)
+        new(csmall, Zsmall, iZsmall, QQ, RQ, c, v, F, iF, iFv, a1,
+            cholF, cholH, ZP, Fstar, ZPstar, K0, iFZ, K, PTmp, oldP, uK0,
+            uK1, K0_Finf, PZi, lik, ystar, Zstar, Hstar, kalman_tol)
     end
 end
 
@@ -386,8 +371,8 @@ function diffuse_kalman_filter_init!(Y::AbstractArray{X},
         vcholF = view(ws.cholF, 1:ndata, 1:ndata, t)
         vcholH = changeH ? view(ws.cholH, 1:ndata, 1:ndata, t) : view(ws.cholH, 1:ndata, 1:ndata)
         viFv = view(ws.iFv, 1:ndata, t)
-        vKinf = view(ws.Kinf, 1:ndata, :, t)
-        vKstar = view(ws.K, 1:ndata, :, t)
+        vK0 = view(ws.K0, 1:ndata, :, t)
+        vK1 = view(ws.K, 1:ndata, :, t)
 
         # v  = Y[:,t] - c - Z*a
         get_v!(vv, Y, vc, vZsmall, va, t, pattern)
@@ -395,22 +380,25 @@ function diffuse_kalman_filter_init!(Y::AbstractArray{X},
         get_F!(vFinf, vZPinf, vZsmall, vPinf)
         info = get_cholF!(vcholF, vFinf)
         if info > 0
-            if norm(vFinf) < tol
-                get_updated_Finfnull!(vatt,
-                                      vPinftt,
-                                      vPstartt,
-                                      vZPinf,
-                                      vZPstar,
-                                      vcholF,
-                                      vFstar,
-                                      vZsmall,
-                                      vPstar,
-                                      vH,
-                                      vKinf,
-                                      vKstar,
-                                      va,
-                                      vv,
-                                      vPinf)
+            if norm(vFinf) < tol || rcond(vFinf) < ws.kalman_tol
+                get_updated_Finfnull2!(vatt,
+                                       vPinftt,
+                                       vPstartt,
+                                       vZPinf    ,
+                                       vZPstar,
+                                       vcholF,
+                                       vFstar,
+                                       vZsmall,
+                                       vPstar,
+                                       vH,
+                                       vK0,
+                                       va,
+                                       vv,
+                                       vPinf,
+                                      ws.kalman_tol)
+                # iFv = inv(F)*v
+                get_iFv!(viFv, vcholF, vv)
+                ws.lik[t] = ndata*l2pi + log(det_from_cholesky(vcholF)) + LinearAlgebra.dot(vv, viFv)
             else
                 vcholF[1] = NaN
                 if !cholHset
@@ -418,7 +406,7 @@ function diffuse_kalman_filter_init!(Y::AbstractArray{X},
                     cholHset = true
                 end
                 ws.lik[t] += ndata*l2pi + univariate_step(vatt, va1, vPinftt, vPinf1, vPstartt, vPstar1, Y, t, vc, vZsmall, vvH, vd, vT, ws.QQ, va, vPinf, vPstar, diffuse_kalman_tol, kalman_tol, ws, pattern)
-                break
+                continue
             end
         else
             ws.lik[t] = ndata*l2pi + log(det_from_cholesky(vcholF))
@@ -432,8 +420,8 @@ function diffuse_kalman_filter_init!(Y::AbstractArray{X},
                                      vZsmall,
                                      vPstar,
                                      vH,
-                                     vKinf,
-                                     vKstar,
+                                     vK0,
+                                     vK1,
                                      va,
                                      vv,
                                      vPinf,
@@ -451,73 +439,6 @@ function diffuse_kalman_filter_init!(Y::AbstractArray{X},
         t += 1
     end
     return t
-end
-
-function get_updated_Finfnonnull!(vatt,
-                                  vPinftt,
-                                  vPstartt,
-                                  vZPinf,
-                                  vZPstar,
-                                  vcholF,
-                                  vFstar,
-                                  vZsmall,
-                                  vPstar,
-                                  vH,
-                                  vKinf,
-                                  vKstar,
-                                  va,
-                                  vv,
-                                  vPinf,
-                                  PTmp)
-    # Kinf   = iFinf*Z*Pinf                                   %define Kinf'=T^{-1}*K_0 with M_{\infty}=Pinf*Z'
-    get_K!(vKinf, vZPinf, vcholF)
-    # Fstar  = Z*Pstar*Z' + H;                                        %(5.7) DK(2012)
-    get_F!(vFstar, vZPstar, vZsmall, vPstar, vH)
-    # Kstar  = iFinf*(Z*Pstar - Fstar*Kinf)                           %(5.12) DK(2012);
-    # note that there is a typo in DK (2003) with "+ Kinf" instead of "- Kinf",
-    # but it is correct in their appendix
-    get_Kstar!(vKstar, vZsmall, vPstar, vFstar, vKinf, vcholF)
-    # att = a + Kinf'*v                                                (5.13) DK(2012)
-    get_updated_a!(vatt, va, vKinf, vv)
-    # Pinf_tt = Pinf - Kinf'*Z*Pinf                                    %(5.14) DK(2012)
-    get_updated_Ptt!(vPinftt, vPinf, vKinf, vZPinf)
-    # Pstartt = Pstar-Pstar*Z'*Kinf-Pinf*Z'*Kstar                           %(5.14) DK(2012)
-    get_updated_Pstartt!(vPstartt, vPstar, vZPstar, vKinf, vZPinf,
-                         vKstar, vPinftt, PTmp)
-end
-
-function get_updated_Finfnull!(vatt,
-                               vPinftt,
-                               vPstartt,
-                               vZPinf,
-                               vZPstar,
-                               vcholF,
-                               vFstar,
-                               vZsmall,
-                               vPstar,
-                               vH,
-                               vKinf,
-                               vKstar,
-                               va,
-                               vv,
-                               vPinf)
-    # Kinf   = iFinf*Z*Pinf                                   %define Kinf'=T^{-1}*K_0 with M_{\infty}=Pinf*Z'
-    get_K!(vKinf, vZPinf, vcholF)
-    # Fstar  = Z*Pstar*Z' + H;                                        %(5.7) DK(2012)
-    get_F!(vFstar, vZPstar, vZsmall, vPstar, vH)
-    info = get_cholF!(vcholF, vFstar)
-    display(vFstar)
-    if info > 0 
-        throw(ErrorException("vFstar is singular"))
-    end
-    # Kstar = iFstar*Z*Pstar
-    get_K!(vKstar, vZPstar, vcholF)
-    # att = a + Kstar'*v                                                (5.15) DK(2012)
-    get_updated_a!(vatt, va, vKstar, vv)
-    # Pinftt = Pinf
-    vPinftt = vPinf
-    # Pstartt = Pstar - Kinf'*Z*Pstar
-    get_updated_Ptt!(vPstartt, vPstar, vKinf, vZPstar)
 end
 
 function diffuse_kalman_filter!(Y::AbstractArray{X},
