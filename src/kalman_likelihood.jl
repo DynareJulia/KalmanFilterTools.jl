@@ -88,7 +88,7 @@ function kalman_likelihood(Y::AbstractMatrix{X},
         # F  = Z*P*Z' + H
         get_F!(ws.F, ws.ZP, Z, P, H)
         info = get_cholF!(ws.cholF, ws.F)
-        if info != 0
+        if info != 0 || rcond(ws.cholF) < 1e-12
             # F is near singular
             if !cholHset
                 get_cholF!(ws.cholH, H)
@@ -154,7 +154,7 @@ function kalman_likelihood(Y::AbstractMatrix{X},
         # F  = Z*P*Z' + H
         get_F!(vF, vZP, vZsmall, P, vH)
         info = get_cholF!(vcholF, vF)
-        if info != 0
+        if info != 0 || rcond(vcholF) < 1e-10
             # F is near singular
             if !cholHset
                 get_cholF!(vcholH, vH)
@@ -207,35 +207,38 @@ function kalman_likelihood_monitored(Y::AbstractMatrix{X},
         if !steady
             # F  = Z*P*Z' + H
             get_F!(ws.F, ws.ZP, Z, P, H)
-            info = get_cholF!(ws.cholF, ws.F)
-            if info != 0
-                # F is near singular
-                if !cholHset
-                    get_cholF!(ws.cholH, H)
-                    cholHset = true
-                end
-                ws.lik[t] = univariate_step!(Y, t, Z, H, T, ws.QQ, a, P, ws.kalman_tol, ws)
-                t += 1
-                continue
+        end
+        info = get_cholF!(ws.cholF, ws.F)
+        if info != 0 || rcond(ws.cholF) < 1e-12
+            # F is near singular
+            if !cholHset
+                get_cholF!(ws.cholH, H)
+                cholHset = true
             end
-        end
-        # iFv = inv(F)*v
-        get_iFv!(ws.iFv, ws.cholF, ws.v)
-        ws.lik[t] = log(det_from_cholesky(ws.cholF)) + LinearAlgebra.dot(ws.v, ws.iFv)
-        if !steady
+            ws.lik[t] = univariate_step!(Y, t, Z, H, T, ws.QQ, a, P, ws.kalman_tol, ws)
+            t += 1
+            continue
+        else
+            # iFv = inv(F)*v
+            if !steady
+                get_iFv!(ws.iFv, ws.cholF, ws.v)
+            end
+            ws.lik[t] = log(det_from_cholesky(ws.cholF)) + LinearAlgebra.dot(ws.v, ws.iFv)
+            if !steady
             # K = iF*Z*P
-            get_K!(ws.K, ws.ZP, ws.cholF)
-        end
-        # a = T(a + K'*v)
-        update_a!(a, ws.K, ws.v, ws.a1, T)
-        if !steady
-            # P = T*(P - K'*Z*P)*T'+ QQ
-            update_P!(P, T, ws.QQ, ws.K, ws.ZP, ws.PTmp)
-            ws.oldP .-= P
-            if norm(ws.oldP) < 0*ns*eps()
-                steady = true
-            else
-                copy!(ws.oldP, P)
+                get_K!(ws.K, ws.ZP, ws.cholF)
+            end
+            # a = T(a + K'*v)
+            update_a!(a, ws.K, ws.v, ws.a1, T)
+            if !steady
+                # P = T*(P - K'*Z*P)*T'+ QQ
+                update_P!(P, T, ws.QQ, ws.K, ws.ZP, ws.PTmp)
+                ws.oldP .-= P
+                if norm(ws.oldP) < 0*ns*eps()
+                    steady = true
+                else
+                    copy!(ws.oldP, P)
+                end
             end
         end
         t += 1
@@ -286,38 +289,40 @@ function kalman_likelihood_monitored(Y::AbstractMatrix{X},
         if !steady
             # F  = Z*P*Z' + H
             get_F!(vF, vZP, Z, P, vH)
-            info = get_cholF!(vcholF, ws.F)
-            if info != 0
-                # F is near singular
-                if !cholHset
-                    get_cholF!(ws.cholH, H)
-                    cholHset = true
+            info = get_cholF!(vcholF, vF)
+        end
+        if info != 0 || rcond(vcholF) < 1e-12
+            # F is near singular
+            if !cholHset
+                get_cholF!(ws.cholH, H)
+                cholHset = true
+            end
+            ws.lik[t] = ndata*l2pi + univariate_step!(Y, t, Z, H, T, ws.QQ, a, P, ws.kalman_tol, ws, pattern)
+            t += 1
+            continue
+        else
+            if !steady
+                get_iFv!(ws.iFv, ws.cholF, ws.v)
+            end
+            ws.lik[t] = ndata*l2pi + log(det_from_cholesky(vcholF)) + LinearAlgebra.dot(vv, viFv)
+            if !steady
+                # K = iF*Z*P
+                get_K!(vK, vZP, vcholF)
+            end
+            # a = T(a + K'*v)
+            update_a!(a, vK, vv, ws.a1, T)
+            if !steady
+                # P = T*(P - K'*Z*P)*T'+ QQ
+                update_P!(P, T, ws.QQ, vK, vZP, ws.PTmp)
+                ws.oldP .-= P
+                if norm(ws.oldP) < 0*ns*eps()
+                    steady = true
+                else
+                    copy!(ws.oldP, P)
                 end
-                ws.lik[t] = ndata*l2pi + univariate_step!(Y, t, Z, H, T, ws.QQ, a, P, ws.kalman_tol, ws, pattern)
-                t += 1
-                continue
             end
+            t += 1
         end
-        # iFv = inv(F)*v
-        get_iFv!(viFv, vcholF, vv)
-        ws.lik[t] = ndata*l2pi + log(det_from_cholesky(vcholF)) + LinearAlgebra.dot(vv, viFv)
-        if !steady
-            # K = iF*Z*P
-            get_K!(vK, vZP, vcholF)
-        end
-        # a = T(a + K'*v)
-        update_a!(a, vK, vv, ws.a1, T)
-        if !steady
-            # P = T*(P - K'*Z*P)*T'+ QQ
-            update_P!(P, T, ws.QQ, vK, vZP, ws.PTmp)
-            ws.oldP .-= P
-            if norm(ws.oldP) < 0*ns*eps()
-                steady = true
-            else
-                copy!(ws.oldP, P)
-            end
-        end
-        t += 1
     end
     @inbounds vlik = view(ws.lik, start + presample:last)
     return @inbounds -0.5*sum(vlik)
@@ -526,11 +531,11 @@ struct DiffuseKalmanLikelihoodWs{T, U} <: KalmanWs{T, U}
     ZPstar::Matrix{T}
     K::Matrix{T}
     iFZ::Matrix{T}
-    Kstar::Matrix{T}
+    K1::Matrix{T}
     PTmp::Matrix{T}
-    uKinf::Vector{T}
-    uKstar::Vector{T}
-    Kinf_Finf::Vector{T}
+    uK0::Vector{T}
+    uK1::Vector{T}
+    K0_F1::Vector{T}
     ystar::Vector{T}
     Zstar::Matrix{T}
     Hstar::Matrix{T}
@@ -554,11 +559,11 @@ struct DiffuseKalmanLikelihoodWs{T, U} <: KalmanWs{T, U}
         ZPstar = Matrix{T}(undef, ny, ns)
         K = Matrix{T}(undef, ny, ns)
         iFZ = Matrix{T}(undef, ny, ns)
-        Kstar = Matrix{T}(undef, ny, ns)
+        K1 = Matrix{T}(undef, ny, ns)
         PTmp = Matrix{T}(undef, ns, ns)
-        uKinf = Vector{T}(undef, ns)
-        uKstar = Vector{T}(undef, ns)
-        Kinf_Finf = Vector{T}(undef, ns)
+        uK0 = Vector{T}(undef, ns)
+        uK1 = Vector{T}(undef, ns)
+        K0_F1 = Vector{T}(undef, ns)
         ystar = Vector{T}(undef, ny)
         Zstar = Matrix{T}(undef, ny, ns)
         Hstar = Matrix{T}(undef, ny, ny)
@@ -566,7 +571,7 @@ struct DiffuseKalmanLikelihoodWs{T, U} <: KalmanWs{T, U}
         lik = zeros(T, nobs)
         kalman_tol = 1e-12
         new(csmall, Zsmall, iZsmall, QQ, RQ, v, F, iF, iFv, a1, cholF, ZP, Fstar,
-            ZPstar, K, iFZ, Kstar, PTmp, uKinf, uKstar, Kinf_Finf, ystar, Zstar, Hstar,
+            ZPstar, K, iFZ, K1, PTmp, uK0, uK1, K0_F1, ystar, Zstar, Hstar,
             PZi, lik, kalman_tol)
     end
 end
@@ -597,38 +602,45 @@ function diffuse_kalman_likelihood_init!(Y::Matrix{U},
         # v  = Y[:,t] - Z*a
         get_v!(ws.v, Y, Z, a, iy, ny)
         iy += ny
-        # Finf = Z*Pinf*Z'
+        # F1 = Z*Pinf*Z'
         get_F!(ws.F, ws.ZP, Z, Pinf)
         info = get_cholF!(ws.cholF, ws.F)
         if info > 0
-            if norm(ws.F) < tol
-                return t - 1
+            if norm(ws.F) < tol 
+                get_updated_Finfnull1!(a, Pinf, Pstar, ws.ZPstar, ws.cholF, ws.Fstar, Z, H, T, ws.K, QQ, ws.a1, ws.v, ws.PTmp, kalman_tol)
+                # iFv = inv(F)*v
+                get_iFv!(ws.iFv, ws.cholF, ws.v)
+                ws.lik[t] = ny*log(2*pi) + log(det_from_cholesky(ws.cholF)) + LinearAlgebra.dot(ws.v, ws.iFv)
+                continue
             else
                 ws.lik[t] += univariate_step(Y, t, Z, H, T, QQ, a, Pinf, Pstar, diffuse_kalman_tol, kalman_tol, ws)
             end
         else
             ws.lik[t] = log(det_from_cholesky(ws.cholF))
-            # Kinf   = iFinf*Z*Pinf                                   %define Kinf'=T^{-1}*K_0 with M_{\infty}=Pinf*Z'
+            # K0   = iF1*Z*Pinf                                   %define K0'=T^{-1}*K_0 with M_{\infty}=Pinf*Z'
             copy!(ws.K, ws.ZP)
             LAPACK.potrs!('U', ws.cholF, ws.K)
             # Fstar  = Z*Pstar*Z' + H;                                        %(5.7) DK(2012)
             get_F!(ws.Fstar, ws.ZPstar, Z, Pstar, H)
-            # Kstar  = iFinf*(Z*Pstar - Fstar*Kinf)                           %(5.12) DK(2012); note that there is a typo in DK (2003) with "+ Kinf" instead of "- Kinf", but it is correct in their appendix
-            get_Kstar!(ws.Kstar, Z, Pstar, ws.Fstar, ws.K, ws.cholF)
-            # Pstar  = T*(Pstar-Pstar*Z'*Kinf-Pinf*Z'*Kstar)*T'+QQ;         %(5.14) DK(2012)
+            # K1  = iF1*(Z*Pstar - Fstar*K0)                           %(5.12) DK(2012); note that there is a typo in DK (2003) with "+ K0" instead of "- K0", but it is correct in their appendix
+            get_K1!(ws.K1, Z, Pstar, ws.Fstar, ws.K, ws.cholF)
+            # Pstar  = T*(Pstar-Pstar*Z'*K0-Pinf*Z'*K1)*T'+QQ;         %(5.14) DK(2012)
             copy!(ws.PTmp, Pstar)
             gemm!('T','N',-1.0,ws.ZPstar, ws.K, 1.0, ws.PTmp)
-            gemm!('T','N',-1.0,ws.ZP, ws.Kstar, 1.0, ws.PTmp)
+            gemm!('T','N',-1.0,ws.ZP, ws.K1, 1.0, ws.PTmp)
             copy!(Pstar, ws.PTmp)
             mul!(ws.PTmp,T,Pstar)
             copy!(Pstar, QQ)
             gemm!('N','T',1.0,ws.PTmp,T,1.0,Pstar)
-            # Pinf   = T*(Pinf-Pinf*Z'*Kinf)*T';                             %(5.14) DK(2012)
+            # Pinf   = T*(Pinf-Pinf*Z'*K0)*T';                             %(5.14) DK(2012)
             gemm!('T','N', -1.0,ws.ZP, ws.K,1.0,Pinf)
             mul!(ws.PTmp,T,Pinf)
             mul!(Pinf,ws.PTmp,transpose(T))
-            # a      = T*(a+Kinf*v);                                          %(5.13) DK(2012)
+            # a      = T*(a+K0*v);                                          %(5.13) DK(2012)
             update_a!(a, ws.K, ws.v, ws.a1, T)
+        end
+        if norm(Pinf) < tol
+            return t
         end
         t += 1
     end
@@ -669,44 +681,51 @@ function diffuse_kalman_likelihood_init!(Y::Matrix{U},
         vcholF = view(ws.cholF, 1:ndata, 1:ndata)
         viFv = view(ws.iFv, 1:ndata)
         vK = view(ws.K, 1:ndata, :)
-        vKstar = view(ws.Kstar, 1:ndata, :)
+        vK1 = view(ws.K1, 1:ndata, :)
         vZsmall = get_vZsmall(ws.Zsmall, ws.iZsmall, Z, pattern, ndata, ny)
 
         # v  = Y[:,t] - Z*a
         get_v!(vv, Y, vZsmall, a, t, pattern)
         iy += ny
-        # Finf = Z*Pinf*Z'
+        # F1 = Z*Pinf*Z'
         get_F!(vF, vZP, vZsmall, Pinf)
         info = get_cholF!(vcholF, vF)
         if info > 0
             if norm(vF) < tol
-                return t - 1
+                get_updated_Finfnull!(a, Pinf, Pstar, vZPstar, vcholF, vFstar, vZsmall, vH, T, vK, QQ, ws.a1, vv, kalman_tol)
+                # iFv = inv(F)*v
+                get_iFv!(viFv, vcholF, vv)
+                ws.lik[t] = ndata*l2pi + log(det_from_cholesky(vcholF)) + LinearAlgebra.dot(vv, viFv)
+                continue
             else
                 ws.lik[t] += ndata*l2pi + univariate_step(Y, t, vZsmall, H, T, QQ, a, Pinf, Pstar, diffuse_kalman_tol, kalman_tol, pattern, ws, pattern)
             end
         else
             ws.lik[t] = ndata*l2pi + log(det_from_cholesky(vcholF))
-            # Kinf   = iFinf*Z*Pinf                                   %define Kinf'=T^{-1}*K_0 with M_{\infty}=Pinf*Z'
+            # K0   = iF1*Z*Pinf                                   %define K0'=T^{-1}*K_0 with M_{\infty}=Pinf*Z'
             copy!(vK, vZP)
             LAPACK.potrs!('U', vcholF, vK)
             # Fstar  = Z*Pstar*Z' + H;                                        %(5.7) DK(2012)
             get_F!(vFstar, vZPstar, vZsmall, Pstar, vH)
-            # Kstar  = iFinf*(Z*Pstar - Fstar*Kinf)                           %(5.12) DK(2012); note that there is a typo in DK (2003) with "+ Kinf" instead of "- Kinf", but it is correct in their appendix
-            get_Kstar!(vKstar, Z, Pstar, vFstar, vK, vcholF)
-            # Pstar  = T*(Pstar-Pstar*Z'*Kinf-Pinf*Z'*Kstar)*T'+QQ;         %(5.14) DK(2012)
+            # K1  = iF1*(Z*Pstar - Fstar*K0)                           %(5.12) DK(2012); note that there is a typo in DK (2003) with "+ K0" instead of "- K0", but it is correct in their appendix
+            get_K1!(vK1, Z, Pstar, vFstar, vK, vcholF)
+            # Pstar  = T*(Pstar-Pstar*Z'*K0-Pinf*Z'*K1)*T'+QQ;         %(5.14) DK(2012)
             copy!(ws.PTmp, Pstar)
             gemm!('T','N',-1.0, vZPstar, vK, 1.0, ws.PTmp)
-            gemm!('T','N',-1.0, vZP, vKstar, 1.0, ws.PTmp)
+            gemm!('T','N',-1.0, vZP, vK1, 1.0, ws.PTmp)
             copy!(Pstar, ws.PTmp)
             mul!(ws.PTmp,T,Pstar)
             copy!(Pstar, QQ)
             gemm!('N','T',1.0,ws.PTmp,T,1.0,Pstar)
-            # Pinf   = T*(Pinf-Pinf*Z'*Kinf)*T';                             %(5.14) DK(2012)
+            # Pinf   = T*(Pinf-Pinf*Z'*K0)*T';                             %(5.14) DK(2012)
             gemm!('T','N', -1.0, vZP, ws.K,1.0,Pinf)
             mul!(ws.PTmp,T,Pinf)
             mul!(Pinf,ws.PTmp,transpose(T))
-            # a      = T*(a+Kinf*v);                                          %(5.13) DK(2012)
+            # a      = T*(a+K0*v);                                          %(5.13) DK(2012)
             update_a!(a, vK, vv, ws.a1, T)
+        end
+        if norm(Pinf) < tol
+            return t
         end
         t += 1
     end

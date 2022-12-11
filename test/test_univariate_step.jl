@@ -171,29 +171,29 @@ Finf = copy(Finf0)
 Fstar0 = Z*pstar0*Z' + H
 Fstar = copy(Fstar0)
 
-Kinf0 = pinf0*Z'*inv(Finf0)
-Kinf = copy(Kinf0)
+K00 = pinf0*Z'*inv(Finf0)
+K0 = copy(K00)
 K0 = pstar0*Z'*inv(Finf0) - pinf0*Z'*inv(Finf0)*Fstar0*inv(Finf0) 
 K = copy(K0)
 
-L0_target = I(ns) - Kinf0*Z
+L0_target = I(ns) - K00*Z
 L1_target = -K0*Z
 r1_target = Z'inv(Finf)*v + L0_target'*r1 +L1_target'*r0
 r0_target = L0_target'*r0
 N0_target = L0_target'*N0*L0_target
 N1_target = Z'*inv(Finf)*Z + L0_target'*N1*L0_target + L1_target'*N0_target*L0_target
-F2 = -inv(Finf)*Fstar*inv(Finf)
-N2_target = Z'F2*Z + L0_target'*N2*L0_target' + L0_target'*N1_target*L1_target + L1_target*N1_target*L0_target + L1_target'*N0_target*L1_target 
+Fstar = -inv(Finf)*Fstar*inv(Finf)
+N2_target = Z'Fstar*Z + L0_target'*N2*L0_target' + L0_target'*N1_target*L1_target + L1_target*N1_target*L0_target + L1_target'*N0_target*L1_target 
 
 tol = 1e-12
 println("Smoothing")
 KalmanFilterTools.univariate_diffuse_smoother_step!(T, ws.F[:, :, 1], ws.Fstar[:, :, 1],
-                                                    ws.Kinf[:, :, 1], ws.K[:, :, 1],
+                                                    ws.K0[:, :, 1], ws.K[:, :, 1],
                                                     ws.L, ws.L1, ws.N, ws.N1,
                                                     ws.N2, r0, r1, ws.v[:,1], Z,
                                                     tol, ws)
 
-@test Z'inv(Finf)*ws.v[:,1] ≈ (I(ns) - ws.Kinf[1, :, 1]*transpose(Z[1, :])/ws.F[1,1,1])*Z[2,:]*ws.v[2,1]/ws.F[2,2,1] + Z[1,:]*ws.v[1,1]/ws.F[1,1,1]
+@test Z'inv(Finf)*ws.v[:,1] ≈ (I(ns) - ws.K0[1, :, 1]*transpose(Z[1, :])/ws.F[1,1,1])*Z[2,:]*ws.v[2,1]/ws.F[2,2,1] + Z[1,:]*ws.v[1,1]/ws.F[1,1,1]
 
 
 

@@ -52,13 +52,13 @@ tmp = randn(ny, ns)
 KalmanFilterTools.get_D!(D, cholF.U, K, T, N, KT, tmp)
 @test D ≈ inv(F) + K*T*N*T'*K'
 
-# D_t = KDKinf_t'*N0_t*KDKinf_t    (DK p. 135)
+# D_t = KDK0_t'*N0_t*KDK0_t    (DK p. 135)
 D = randn(ny, ny)
-KDKinf = randn(ns, ny)
+KDK0 = randn(ns, ny)
 N0 = randn(ns, ns)
 Tmp = randn(ny, ns)
-KalmanFilterTools.get_D!(D, KDKinf,  N0, Tmp)
-@test D ≈ KDKinf'*N0*KDKinf
+KalmanFilterTools.get_D!(D, KDK0,  N0, Tmp)
+@test D ≈ KDK0'*N0*KDK0
 
 # epsilonh_t = H*(iF_t*v_t - K_t*T*r_t)
 epsilon = randn(ny)
@@ -73,13 +73,13 @@ tmp2 = zeros(ns)
 KalmanFilterTools.get_epsilonh!(epsilon, H, iFv, K, T, r, tmp1, tmp2)
 @test epsilon ≈ H*(iFv - K*T*r)
 
-# epsilon_t = -H_t*KDKinf*r0_t         (DK p. 135)
+# epsilon_t = -H_t*KDK0*r0_t         (DK p. 135)
 H = randn(ny, ny)
-KDKinf = randn(ns, ny)
+KDK0 = randn(ns, ny)
 r0 = randn(ns)
 tmp = randn(ny)
-KalmanFilterTools.get_epsilonh!(epsilon, H, KDKinf, r0, tmp)
-@test epsilon ≈ - H*KDKinf'*r0
+KalmanFilterTools.get_epsilonh!(epsilon, H, KDK0, r0, tmp)
+@test epsilon ≈ - H*KDK0'*r0
 
 # etah = Q*R'*r_t
 eta = randn(np)
@@ -162,7 +162,7 @@ KalmanFilterTools.get_K!(K, ZP, cholF)
 @test K ≈ inv(F)*Z*P
 
 K = F\Z*Pinf
-Kstar = similar(K)
+K1 = similar(K)
 Fstar = zeros(ny, ny)
 ZPstar = zeros(ny, ns)
 Z = randn(ny, ns)
@@ -171,16 +171,16 @@ H = randn(ny, ny)
 KalmanFilterTools.get_F!(Fstar, ZPstar, Z, Pstar, H)
 @test Fstar ≈ Z*Pstar*Z' + H
 
-KalmanFilterTools.get_Kstar!(Kstar, Z, Pstar, Fstar, K, cholF)
-@test Kstar ≈ F\(Z*Pstar - Fstar*K)
+KalmanFilterTools.get_K1!(K1, Z, Pstar, Fstar, K, cholF)
+@test K1 ≈ F\(Z*Pstar - Fstar*K)
 
-Kstar = randn(ny, ns)
+K1 = randn(ny, ns)
 z = [4, 3, 2]
 F = 0.5*(F + F')
 cholF = copy(F)
 LAPACK.potrf!('U', cholF)
-KalmanFilterTools.get_Kstar!(Kstar, z, Pstar, Fstar, K, cholF)
-@test Kstar ≈ F\(Pstar[z,:] - Fstar*K)
+KalmanFilterTools.get_K1!(K1, z, Pstar, Fstar, K, cholF)
+@test K1 ≈ F\(Pstar[z,:] - Fstar*K)
 
 # L_t = T - K(DK)_t*Z (DK 4.29)
 z = [2, 3, 1]
@@ -225,17 +225,17 @@ ZP = randn(ny, ns)
 KalmanFilterTools.get_updated_Ptt!(Ptt, P, K, ZP)
 @test Ptt ≈ P - transpose(K)*ZP
 
-# Pstartt = Pstar-Pstar*Z'*Kinf-Pinf*Z'*Kstar                           %(5.14) DK(2012)
+# Pstartt = Pstar-Pstar*Z'*K0-Pinf*Z'*K1                           %(5.14) DK(2012)
 Pstartt = randn(ns, ns)
 Pstar = randn(ns, ns)
 ZPstar = randn(ny, ns)
-Kinf = randn(ny, ns)
+K0 = randn(ny, ns)
 ZPinf = randn(ny, ns)
-Kstar = randn(ny, ns)
+K1 = randn(ny, ns)
 Pinftt = randn(ns, ns)
 PTmp = randn(ns, ns)
-KalmanFilterTools.get_updated_Pstartt!(Pstartt, Pstar, ZPstar, Kinf, ZPinf, Kstar, Pinftt, PTmp)
-@test Pstartt ≈ Pstar - transpose(ZPstar)*Kinf - transpose(ZPinf)*Kstar
+KalmanFilterTools.get_updated_Pstartt!(Pstartt, Pstar, ZPstar, K0, ZPinf, K1, Pinftt, PTmp)
+@test Pstartt ≈ Pstar - transpose(ZPstar)*K0 - transpose(ZPinf)*K1
 
 # V_t = P_t - P_t*N_{t-1}*P_t
 V = Matrix{Float64}(undef, ns, ns)
@@ -529,28 +529,28 @@ ZW = randn(ny, ny)
 gemm!('N', 'T', 1.0, ZWM, ZW, 1.0,F)
 @test F ≈ F_0 + ZWM*ZW'
 
-# Pstar  = T*(Pstar-Pstar*Z'*Kinf-Pinf*Z'*Kstar)*T'+QQ;         %(5.14) DK(2012)
+# Pstar  = T*(Pstar-Pstar*Z'*K0-Pinf*Z'*K1)*T'+QQ;         %(5.14) DK(2012)
 Pstar = randn(ns, ns)
 PstarOrig = copy(Pstar)
 T = randn(ns, ns)
 ZPinf = randn(ny, ns)
 ZPstar = randn(ny, ns)
-Kinf = randn(ny, ns)
-Kstar = randn(ny, ns)
+K0 = randn(ny, ns)
+K1 = randn(ny, ns)
 QQ = randn(ns, ns)
 PTmp = randn(ns, ns)
-KalmanFilterTools.update_Pstar!(Pstar, T, ZPinf, ZPstar, Kinf, Kstar, QQ, PTmp)
-@test Pstar ≈ T*(PstarOrig-ZPstar'*Kinf-ZPinf'*Kstar)*T'+QQ
+KalmanFilterTools.update_Pstar!(Pstar, T, ZPinf, ZPstar, K0, K1, QQ, PTmp)
+@test Pstar ≈ T*(PstarOrig-ZPstar'*K0-ZPinf'*K1)*T'+QQ
 
-# Pinf   = T*(Pinf-Pinf*Z'*Kinf)*T';                             %(5.14) DK(2012)
+# Pinf   = T*(Pinf-Pinf*Z'*K0)*T';                             %(5.14) DK(2012)
 Pinf = randn(ns, ns)
 PinfOrig = copy(Pinf)
 T = randn(ns, ns)
 ZPinf = randn(ny, ns)
-Kinf = randn(ny,ns)
+K0 = randn(ny,ns)
 PTmp = randn(ns, ns)
-KalmanFilterTools.update_Pinf!(Pinf, T, ZPinf, Kinf, PTmp)
-@test Pinf ≈ T*(PinfOrig - ZPinf'*Kinf)*T'
+KalmanFilterTools.update_Pinf!(Pinf, T, ZPinf, K0, PTmp)
+@test Pinf ≈ T*(PinfOrig - ZPinf'*K0)*T'
 
 # rstar_{t-1} = Z_t'*iFinf_t*v_t + Linf_t'rstar_t + Lstar_t'*rinf_t (DK 5.21)
 rstar = randn(ns)
