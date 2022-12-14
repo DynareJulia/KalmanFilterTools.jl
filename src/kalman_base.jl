@@ -330,7 +330,7 @@ function get_updated_Finfnull1!(a, Pinf, Pstar, ZPstar, cholF, Fstar, Z, H, T, K
     # a = T(a + K'*v)
     update_a!(a, K, v, a1, T)
     # Pinf = T*Pinf*T'
-    update_P!(Pinf, T, Pinf, Ptmp)
+    update_P!(Pinf, T, Ptmp)
     # Pstar = T*(Pstar - K'*Z*Pstar)*T'+ QQ
     update_P!(Pstar, T, QQ, K, ZPstar, Ptmp)
 end
@@ -696,8 +696,14 @@ function update_P!(P::AbstractArray{U}, T::AbstractArray{U}, Ptt::AbstractArray{
     mul!(P, T, Ptmp, 1.0, 1.0)
 end
 
-# Pinf = T*Pinftt*T'
+# P = T*P*T'
 function update_P!(P::AbstractArray{U}, T::AbstractArray{U}, Ptmp::AbstractArray{U}) where {U<:AbstractFloat}
+    mul!(Ptmp, P, transpose(T))
+    mul!(P, T, Ptmp)
+end
+
+# Pinf = T*Pinftt*T'
+function update_P!(P::AbstractArray{U}, T::AbstractArray{U}, Ptt::AbstractArray, Ptmp::AbstractArray{U}) where {U<:AbstractFloat}
     mul!(Ptmp, Ptt, transpose(T))
     mul!(P, T, Ptmp)
 end
