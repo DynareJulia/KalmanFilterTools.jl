@@ -639,26 +639,26 @@ end
 
     Pstar = T*Pstartt*T'
     KalmanFilterTools.get_updated_Finfnull2!(att,
-                                            Pinftt,
-                                            Pstartt,
-                                            ZPinf,
-                                            ZPstar,
-                                            cholF,
-                                            Fstar,
-                                            Zsmall,
-                                            Pstar,
-                                            H,
-                                            K0,
-                                            a,
-                                            v,
-                                            Pinf,
-                                            1e-12)
+                                             Pinftt,
+                                             Pstartt,
+                                             ZPinf,
+                                             ZPstar,
+                                             cholF,
+                                             Fstar,
+                                             Zsmall,
+                                             Pstar,
+                                             H,
+                                             K0,
+                                             a,
+                                             v,
+                                             Pinf,
+                                             1e-12)
     # K0   = iFsar*Z*Pstar
     Fstar_2 = ZPstar*Z' + H
     K0_2 = Fstar_2\ZPstar
     att2 = a + K0'*v                  
     # Pinf_tt = Pinf
-    Pinftt2 = Pinf
+    Pinftt2 = copy(Pinf)
     # Pstartt = Pstar*L0'
     #         = Pstar*(I - Z'*inv(Fstar)*Z*Pstar)
     #         = Pstar - K0_2'*ZPstar
@@ -670,6 +670,15 @@ end
     @test att2 ≈ att
     @test Pinftt2 ≈ Pinftt
     @test isapprox(Pstartt2, Pstartt, atol = 1e-15)
+
+    a1 = similar(a)
+    K = similar(K0)
+    QQ = R*Q*R'
+    Ptmp = similar(Pinf)
+    KalmanFilterTools.get_updated_Finfnull1!(a1, Pinf, Pstar, ZPstar, cholF, Fstar, Z, H, T, K, QQ, a, v, Ptmp, 1e-12)
+    @test a1 ≈ T*att2
+    @test Pinf ≈ T*Pinftt2*T'
+    @test Pstar ≈ T*Pstartt2*T' + QQ 
 end
 
 @testset "start and last" begin
@@ -727,9 +736,6 @@ end
     llk_5 = diffuse_kalman_likelihood(Y, z, H, T, R, Q, a, Pinf, Pstar, 2, nobs-1, 0, 1e-8, ws4, full_data_pattern)
     @test llk_5 ≈ llk_4 
 end
-
-@testset "smoother" begin
-end    
 
 nothing
 
