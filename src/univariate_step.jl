@@ -144,9 +144,11 @@ function univariate_step(Y, t, Z, H, T, QQ, a, Pinf, Pstar, diffuse_kalman_tol, 
     end
     mul!(ws.a1, T, a)
     a .= ws.a1
-    mul!(ws.PTmp, T, P)
-    copy!(P, RQR)
-    mul!(P, ws.PTmp, T', 1.0, 1.0)
+    mul!(ws.PTmp, T, Pinf)
+    mul!(Pinf, ws.PTmp, transpose(T))
+    mul!(ws.PTmp, T, Pstar)
+    copy!(Pstar, QQ)
+    mul!(Pstar, ws.PTmp, transpose(T), 1.0, 1.0)
     return llik + 2*logdetcholH
 end
 
@@ -177,7 +179,7 @@ function univariate_step(Y, t, Z, H, T, QQ, a, Pinf, Pstar, diffuse_kalman_tol, 
         # Also the test for singularity is better set coarser for Finf than for Fstar for the same reason
         if Finf > diffuse_kalman_tol                 # F_{\infty,t,i} = 0, use upper part of bracket on p. 175 DK (2012) for w_{t,i}
             ws.K0_Finf .= ws.uK0./Finf
-            a .+= prediction_error.*ws.K0_Finf
+            a .+= v .* ws.K0_Finf
             # Pstar     = Pstar + K0*(K0_Finf'*(Fstar/Finf)) - K1*K0_Finf' - K0_Finf*K1'
             ger!( Fstar/Finf, ws.uK0, ws.K0_Finf, Pstar)
             ger!( -1.0, ws.uK1, ws.K0_Finf, Pstar)
@@ -186,7 +188,7 @@ function univariate_step(Y, t, Z, H, T, QQ, a, Pinf, Pstar, diffuse_kalman_tol, 
             ger!(-1.0, ws.uK0, ws.K0_Finf, Pinf)
             llik += log(Finf)
         elseif Fstar > kalman_tol
-            llik += ndata*l2pi, log(Fstar) + v*v/Fstar
+            llik += log(Fstar) + v*v/Fstar
             a .+= ws.uK1.*(v/Fstar)
             ger!(-1/Fstar, ws.uK1, ws.uK1, Pstar)
         else
@@ -194,11 +196,13 @@ function univariate_step(Y, t, Z, H, T, QQ, a, Pinf, Pstar, diffuse_kalman_tol, 
             # p. 157, DK (2012)
         end
     end
+    mul!(ws.PTmp, T, Pinf)
+    mul!(Pinf, ws.PTmp, transpose(T))
+    mul!(ws.PTmp, T, Pstar)
+    copy!(Pstar, QQ)
+    mul!(Pstar, ws.PTmp, transpose(T), 1.0, 1.0)
     mul!(ws.a1, T, a)
     a .= ws.a1
-    mul!(ws.PTmp, T, P)
-    copy!(P, RQR)
-    mul!(P, ws.PTmp, T', 1.0, 1.0)
     return llik + 2*logdetcholH
 end
 
