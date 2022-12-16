@@ -1,3 +1,7 @@
+0.1.2
+=====
+- fix diffuse filter when Finf == 0
+
 0.1.1
 =====
 - fix diffuse smoother
