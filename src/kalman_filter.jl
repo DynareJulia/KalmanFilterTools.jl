@@ -389,9 +389,9 @@ function diffuse_kalman_filter_init!(Y::AbstractArray{X},
                                        vH,
                                        vK0,
                                        va,
-                                      vv,
-                                      vPinf,
-                                      ws.kalman_tol)
+                                       vv,
+                                       vPinf,
+                                       ws.kalman_tol)
                 # iFv = inv(F)*v
                 get_iFv!(viFv, vcholF, vv)
                 ws.lik[t] = ndata*l2pi + log(det_from_cholesky(vcholF)) + LinearAlgebra.dot(vv, viFv)
