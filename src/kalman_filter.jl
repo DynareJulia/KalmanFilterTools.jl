@@ -389,8 +389,8 @@ function diffuse_kalman_filter_init!(Y::AbstractArray{X},
                                        vH,
                                        vK0,
                                        va,
-                                       vv,
-                                       vPinf,
+                                      vv,
+                                      vPinf,
                                       ws.kalman_tol)
                 # iFv = inv(F)*v
                 get_iFv!(viFv, vcholF, vv)
