@@ -1,3 +1,7 @@
+0.1.3
+=====
+- fixing bugs in diffuse filter
+
 0.1.2
 =====
 - fix diffuse filter when Finf == 0
