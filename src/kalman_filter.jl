@@ -375,8 +375,8 @@ function diffuse_kalman_filter_init!(Y::AbstractArray{X},
         # Finf = Z*Pinf*Z'
         get_F!(vFinf, vZPinf, vZsmall, vPinf)
         info = get_cholF!(vcholF, vFinf)
-        if info > 0
-            if norm(vFinf) < tol || rcond(vFinf) < ws.kalman_tol
+        if info > 0 || rcond(vFinf) < ws.kalman_tol
+            if norm(vFinf) < tol
                 get_updated_Finfnull2!(vatt,
                                        vPinftt,
                                        vPstartt,
@@ -402,6 +402,7 @@ function diffuse_kalman_filter_init!(Y::AbstractArray{X},
                     cholHset = true
                 end
                 ws.lik[t] += ndata*l2pi + univariate_step(vatt, va1, vPinftt, vPinf1, vPstartt, vPstar1, Y, t, vc, vZsmall, vvH, vd, vT, ws.QQ, va, vPinf, vPstar, diffuse_kalman_tol, kalman_tol, ws, pattern)
+                t += 1
                 continue
             end
         else

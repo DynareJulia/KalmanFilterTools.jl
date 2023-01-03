@@ -611,7 +611,6 @@ function diffuse_kalman_likelihood_init!(Y::Matrix{U},
                 # iFv = inv(F)*v
                 get_iFv!(ws.iFv, ws.cholF, ws.v)
                 ws.lik[t] = ny*log(2*pi) + log(det_from_cholesky(ws.cholF)) + LinearAlgebra.dot(ws.v, ws.iFv)
-                continue
             else
                 ws.lik[t] += univariate_step(Y, t, Z, H, T, QQ, a, Pinf, Pstar, diffuse_kalman_tol, kalman_tol, ws)
             end
