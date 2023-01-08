@@ -201,7 +201,7 @@ function kalman_smoother!(Y::AbstractArray{V},
             valphah = view(alphah, :, t)
             # alphah_t = a_t + P_t*r_{t-1} (DK 4.44)
             get_alphah!(valphah, va, vP, ws.r)
-        end
+    end
 
         if length(Valpha) > 0
             vValpha = view(Valpha, :, :, t)
@@ -270,6 +270,7 @@ struct DiffuseKalmanSmootherWs{T, U} <: KalmanWs{T, U}
     tmp_ns::Vector{T}
     tmp_ny::Vector{T}
     tmp_ns_np::AbstractArray{T}
+    tmp_ns_ns::AbstractArray{T}
     tmp_ny_ny::AbstractArray{T}
     tmp_ny_ns::AbstractArray{T}
     kalman_tol::T
@@ -325,6 +326,7 @@ struct DiffuseKalmanSmootherWs{T, U} <: KalmanWs{T, U}
         tmp_ns = Vector{T}(undef, ns)
         tmp_ny = Vector{T}(undef, ny)
         tmp_ns_np = Matrix{T}(undef, ns, np)
+        tmp_ns_ns = Matrix{T}(undef, ns, ns)
         tmp_ny_ny = Matrix{T}(undef, ny, ny)
         tmp_ny_ns = Matrix{T}(undef, ny, ns)
         kalman_tol = 1e-12
@@ -334,7 +336,7 @@ struct DiffuseKalmanSmootherWs{T, U} <: KalmanWs{T, U}
             KDK, KDK0, L, L1, N, N_1, N1, N1_1, N2, N2_1, ZP,
             ZPstar, Kv, iFZ, PTmp, oldP, lik, KT, D, uK0, uK1,
             ystar, K0_Finf, Zstar, Hstar, PZi, tmp_np, tmp_ns,
-            tmp_ny, tmp_ns_np, tmp_ny_ny, tmp_ny_ns, kalman_tol)
+            tmp_ny, tmp_ns_np, tmp_ns_ns, tmp_ny_ny, tmp_ny_ns, kalman_tol)
     end
 end
 
@@ -397,7 +399,7 @@ function diffuse_kalman_smoother_coda!(Y::AbstractArray{V},
     fill!(r1_1, 0.0)
 
     ny = size(Y, 1)
-    for t = last: -1: 1
+    for t = last: -1: start
         #inputs
         pattern = data_pattern[t]
         ndata = length(pattern)
@@ -428,14 +430,18 @@ function diffuse_kalman_smoother_coda!(Y::AbstractArray{V},
         if isnan(vcholF[1])
             vFinf =view(ws.F, 1:ndata, 1:ndata, t)
             vFstar =view(ws.Fstar, 1:ndata, 1:ndata, t)
-            if (length(alphah) > 0 ||
-                length(epsilonh) > 0 ||
-                length(etah) > 0)
+            if (length(Valpha) > 0 ||
+                length(Vepsilon) > 0 ||
+                length(Veta) > 0)
+                r00 = copy(r0)
+                r11 = copy(r1)
                 univariate_diffuse_smoother_step!(vT, vFinf, vFstar,
                                                   vK0, vK,
                                                   L0, L1, N0, N1, N2,
-                                                  r0, r1, vv, vZsmall,
+                                                  r0, r1, vv, vZsmall, vPinf, vPstar,
                                                   ws.kalman_tol, ws)
+                @show vZsmall*(vPstar*r0 + vPinf*r1)
+                @show vv
             else
                 univariate_diffuse_smoother_step!(vT, vFinf, vFstar,
                                                   vK0, vK,
@@ -494,8 +500,12 @@ function diffuse_kalman_smoother_coda!(Y::AbstractArray{V},
             mul!(ws.PTmp, transpose(T), N2)
             mul!(N2_1, ws.PTmp, T)
         else
-            # iFv = Finf \ v
-            get_iFv!(viFv, vcholF, vv)
+            if isnan(vcholF[1])
+                @views viFv .= qr(ws.F[:,:,t], Val(true))\vv
+            else
+                # iFv = Finf \ v
+                get_iFv!(viFv, vcholF, vv)
+            end 
             # L0_t = T - KDK0*Z (DK 5.12)
             get_L!(L0, vT, vKDK0, vZsmall)
             # L1_t = - KDK*Z (DK 5.12)
@@ -504,9 +514,9 @@ function diffuse_kalman_smoother_coda!(Y::AbstractArray{V},
             update_r!(r1, vZsmall, viFv, L0, r1_1, L1, r0_1)
             # r0_{t-1} = L0_t'r0_t (DK 5.21)
             mul!(r0, transpose(L0), r0_1)
-            if (length(alphah) > 0 ||
-                length(epsilonh) > 0 ||
-                length(etah) > 0)
+            if (length(Valpha) > 0 ||
+                length(Vepsilon) > 0 ||
+                length(Veta) > 0)
                 # N0_{t-1} = L0_t'N0_t*L0_t (DK 5.29)
                 update_N0!(N0, L0, N0_1, ws.PTmp)
                 # Finf = inv(Finf)

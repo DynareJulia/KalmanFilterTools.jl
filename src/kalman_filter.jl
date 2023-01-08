@@ -369,7 +369,7 @@ function diffuse_kalman_filter_init!(Y::AbstractArray{X},
         viFv = view(ws.iFv, 1:ndata, t)
         vK0 = view(ws.K0, 1:ndata, :, t)
         vK1 = view(ws.K, 1:ndata, :, t)
-
+        
         # v  = Y[:,t] - c - Z*a
         get_v!(vv, Y, vc, vZsmall, va, t, pattern)
         # Finf = Z*Pinf*Z'
@@ -402,8 +402,13 @@ function diffuse_kalman_filter_init!(Y::AbstractArray{X},
                     cholHset = true
                 end
                 ws.lik[t] += ndata*l2pi + univariate_step(vatt, va1, vPinftt, vPinf1, vPstartt, vPstar1, Y, t, vc, vZsmall, vvH, vd, vT, ws.QQ, va, vPinf, vPstar, diffuse_kalman_tol, kalman_tol, ws, pattern)
-                t += 1
-                continue
+                
+                if norm(vPinf1) < tol
+                    return t
+                else
+                    t += 1
+                    continue
+                end 
             end
         else
             ws.lik[t] = ndata*l2pi + log(det_from_cholesky(vcholF))
