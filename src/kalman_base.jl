@@ -96,11 +96,13 @@ function get_etah!(etah::AbstractVector{T}, Q::AbstractArray{T},
     mul!(etah, Q, tmp)
 end
 
+#=
 function get_F(Zi, P, h, tmp)
     mul!(tmp, P, Zi)
     F = dot(Zi, tmp) + h
     return F
 end
+=#
 
 function get_F!(f::AbstractMatrix{T}, zp::AbstractArray{T}, z::AbstractArray{T}, p::AbstractMatrix{T}) where {T<:AbstractFloat}
     mul!(zp, z, p)
@@ -126,24 +128,27 @@ function get_F!(f::AbstractMatrix{T}, zp::AbstractArray{T}, z::AbstractVector{I}
     f .+= view(zp, :, z)
 end
 
-function get_Finf!(z::AbstractVector{T}, p::AbstractArray{T}, ukinf::AbstractVector{T}) where {T<:AbstractFloat}
-    mul!(ukinf, p, z)
-    Finf = BLAS.dot(z, ukinf)                         # F_{\infty,t} in 5.7 in DK (2012), relies on H being diagonal
+function get_Finf!(z::AbstractVector{T}, p::AbstractArray{T}, zp::AbstractVector{T}) where {T<:AbstractFloat}
+    mul!(zp, p, z)
+    Finf = BLAS.dot(zp, z)                    # F_{\infty,t} in 5.7 in DK (2012)
 end
 
-function get_Finf!(z::U, p::AbstractArray{T}, ukinf::AbstractVector{T}) where {T<:AbstractFloat,U<:Integer}
-    ukinf .= view(p, :, z)
-    Finf = BLAS.dot(z, ukinf)                         # F_{\infty,t} in 5.7 in DK (2012), relies on H being diagonal
+function get_Finf!(z::U, p::AbstractArray{T}, zp::AbstractVector{T}) where {T<:AbstractFloat,U<:Integer}
+    # the function must fill up zp
+    zp .= view(p, z, :)
+    return zp[z]                  # F_{\infty,t} in 5.7 in DK (2012)
 end
 
-function get_Fstar!(z::AbstractVector{T}, p::AbstractArray{T}, h::T, uk1::AbstractVector{T}) where {T<:AbstractFloat}
-    mul!(uk1, p, z)
-    Finf = BLAS.dot(z, uk1) + h                 # F_{*,t} in 5.7 in DK (2012), relies on H being diagonal
+function get_Fstar!(z::AbstractVector{T}, p::AbstractArray{T}, h::T, zp::AbstractVector{T}) where {T<:AbstractFloat}
+    mul!(zp, p, z)
+    Fstar = BLAS.dot(zp, z) + h                 # F_{*,t} in 5.7 in DK (2012), relies on H being diagonal
+    return Fstar
 end
 
-function get_Finf!(z::U, p::AbstractArray{T}, h::T, uk1::AbstractVector{T}) where {T<:AbstractFloat,U<:Integer}
-    uk1 .= view(p, :, z)
-    Finf = BLAS.dot(z, uk1) + h                 # F_{*,t} in 5.7 in DK (2012), relies on H being diagonal
+function get_Fstar!(z::U, p::AbstractArray{T}, h::T, zp::AbstractVector{T}) where {T<:AbstractFloat,U<:Integer}
+    # the function must fill up zp
+    zp .= view(p, z, :)
+    return zp[z] + h                 # F_{*,t} in 5.7 in DK (2012), relies on H being diagonal
 end
 
 function get_iF!(iF::AbstractArray{T}, cholF::AbstractArray{T}) where {T<:AbstractFloat}
