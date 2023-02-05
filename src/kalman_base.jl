@@ -96,13 +96,11 @@ function get_etah!(etah::AbstractVector{T}, Q::AbstractArray{T},
     mul!(etah, Q, tmp)
 end
 
-#=
 function get_F(Zi, P, h, tmp)
     mul!(tmp, P, Zi)
     F = dot(Zi, tmp) + h
     return F
 end
-=#
 
 function get_F!(f::AbstractMatrix{T}, zp::AbstractArray{T}, z::AbstractArray{T}, p::AbstractMatrix{T}) where {T<:AbstractFloat}
     mul!(zp, z, p)
@@ -522,7 +520,7 @@ function get_vZsmall(Zsmall::AbstractArray{T}, iZsmall::AbstractVector{U}, z::Ab
     return vZsmall
 end
 
-function get_vZsmall(Zsmall::AbstractArray{T}, iZsmall::AbstractVector{U}, Z::AbstractArray{T}, pattern::AbstractVector{U}, n::U, ny::U, t::U) where {T<:AbstractFloat,U<:Integer}
+function get_vZsmall(Zsmall::AbstractArray{T}, iZsmall::AbstractVector{U}, Z::AbstractArray{T}, pattern, n::U, ny::U, t::U) where {T<:AbstractFloat,U<:Integer}
     changeZ = ndims(Z) > 2
     vZ = changeZ ? view(Z, :, :, t) : view(Z, :, :)
     vZsmall = view(Zsmall, 1:n, :)

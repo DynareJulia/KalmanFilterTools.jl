@@ -40,11 +40,9 @@ function univariate_step!(Y, t, Z, H, T, RQR, a, P, kalman_tol, ws)
         error("singular F with non-diagonal H matrix not yet supported")
         transformed_measurement!(ws.ystar, ws.Zstar, view(Y, :, t), Z, ws.cholH)
         H = I(ny)
-	logdetcholH = 0.0
     else
         copy!(ws.ystar, view(Y, :, t))
         copy!(ws.Zstar, Z)
-        logdetcholH = logproddiag(H)
     end
     llik = 0.0
     for i=1:ny
@@ -63,7 +61,7 @@ function univariate_step!(Y, t, Z, H, T, RQR, a, P, kalman_tol, ws)
     mul!(ws.PTmp, T, P)
     copy!(P, RQR)
     mul!(P, ws.PTmp, T', 1.0, 1.0)
-    return llik + 2*logdetcholH
+    return llik
 end
 
 function univariate_step!(Y, t, Z, H, T, RQR, a, P, kalman_tol, ws, pattern)
@@ -72,11 +70,9 @@ function univariate_step!(Y, t, Z, H, T, RQR, a, P, kalman_tol, ws, pattern)
         error("singular F with non-diagonal H matrix not yet supported")
         transformed_measurement!(ws.ystar, ws.Zstar, view(Y, :, t), Z, ws.cholH)
         H = I(ny)
-	logdetcholH = 0.0
     else
         copy!(ws.ystar, view(Y, :, t))
         copy!(ws.Zstar, Z)
-        logdetcholH = logproddiag(H)
     end
     llik = 0.0
     ndata = length(pattern)
@@ -96,127 +92,18 @@ function univariate_step!(Y, t, Z, H, T, RQR, a, P, kalman_tol, ws, pattern)
     mul!(ws.PTmp, T, P)
     copy!(P, RQR)
     mul!(P, ws.PTmp, T', 1.0, 1.0)
-    return llik + 2*logdetcholH
+    return llik
 end
 
-function univariate_step(Y, t, Z, H, T, QQ, a, Pinf, Pstar, diffuse_kalman_tol, kalman_tol, ws)
+function univariate_step!(Y, t, c, Z, H, d, T, RQR, a, P, kalman_tol, ws)
     ny = size(Y,1)
     if !isdiag(H)
         error("singular F with non-diagonal H matrix not yet supported")
         transformed_measurement!(ws.ystar, ws.Zstar, view(Y, :, t), Z, ws.cholH)
         H = I(ny)
-	logdetcholH = 0.0
     else
         copy!(ws.ystar, view(Y, :, t))
         copy!(ws.Zstar, Z)
-        logdetcholH = logproddiag(H)
-    end
-    llik = 0.0
-    for i=1:size(Y,1)
-        Zi = view(Z, i, :)
-        v = get_v(ws.ystar, ws.Zstar, a, i)
-        Fstar = get_Fstar!(Zi, Pstar, H[i], ws.uK1)
-        Finf = get_Finf!(Zi, Pstar, ws.uK1)
-        # Conduct check of rank
-        # Pinf and Finf are always scaled such that their norm=1: Fstar/Pstar, instead,
-        # depends on the actual values of std errors in the model and can be badly scaled.
-        # experience is that diffuse_kalman_tol has to be bigger than kalman_tol, to ensure
-        # exiting the diffuse filter properly, avoiding tests that provide false non-zero rank for Pinf.
-        # Also the test for singularity is better set coarser for Finf than for Fstar for the same reason
-        if Finf > diffuse_kalman_tol                 # F_{\infty,t,i} = 0, use upper part of bracket on p. 175 DK (2012) for w_{t,i}
-            ws.K0_Finf .= ws.uK0./Finf
-            a .+= ws.v[i].*ws.K0_Finf
-            # Pstar     = Pstar + K0*(K0_Finf'*(Fstar/Finf)) - K1*K0_Finf' - K0_Finf*K1'
-            ger!( Fstar/Finf, ws.uK0, ws.K0_Finf, Pstar)
-            ger!( -1.0, ws.uK1, ws.K0_Finf, Pstar)
-            ger!( -1.0, ws.K0_Finf, ws.uK1, Pstar)
-            # Pinf      = Pinf - K0*K0_Finf'
-            ger!(-1.0, ws.uK0, ws.K0_Finf, Pinf)
-            llik += log(Finf)
-        elseif Fstar > kalman_tol
-            llik += log(Fstar) + ws.v[i]*ws.v[i]/Fstar
-            a .+= ws.uK1.*(ws.v[i]/Fstar)
-            ger!(-1/Fstar, ws.uK1, ws.uK1, Pstar)
-        else
-            # do nothing as a_{t,i+1}=a_{t,i} and P_{t,i+1}=P_{t,i}, see
-            # p. 157, DK (2012)
-        end
-    end
-    mul!(ws.a1, T, a)
-    a .= ws.a1
-    mul!(ws.PTmp, T, Pinf)
-    mul!(Pinf, ws.PTmp, transpose(T))
-    mul!(ws.PTmp, T, Pstar)
-    copy!(Pstar, QQ)
-    mul!(Pstar, ws.PTmp, transpose(T), 1.0, 1.0)
-    return llik + 2*logdetcholH
-end
-
-function univariate_step(Y, t, Z, H, T, QQ, a, Pinf, Pstar, diffuse_kalman_tol, kalman_tol, ws, pattern)
-    ny = size(Y,1)
-    if !isdiag(H)
-        error("singular F with non-diagonal H matrix not yet supported")
-        transformed_measurement!(ws.ystar, ws.Zstar, view(Y, :, t), Z, ws.cholH)
-        H = I(ny)
-	logdetcholH = 0.0
-    else
-        copy!(ws.ystar, view(Y, :, t))
-        copy!(ws.Zstar, Z)
-        logdetcholH = logproddiag(H)
-    end
-    llik = 0.0
-    ndata = length(pattern)
-    for i=1:ndata
-        Zi = view(ws.Zstar, pattern[i], :)
-        v = get_v(ws.ystar, ws.Zstar, a, pattern[i])
-        Fstar = get_Fstar!(Zi, Pstar, H[i], ws.uK1)
-        Finf = get_Finf!(Zi, Pstar, ws.uK1)
-        # Conduct check of rank
-        # Pinf and Finf are always scaled such that their norm=1: Fstar/Pstar, instead,
-        # depends on the actual values of std errors in the model and can be badly scaled.
-        # experience is that diffuse_kalman_tol has to be bigger than kalman_tol, to ensure
-        # exiting the diffuse filter properly, avoiding tests that provide false non-zero rank for Pinf.
-        # Also the test for singularity is better set coarser for Finf than for Fstar for the same reason
-        if Finf > diffuse_kalman_tol                 # F_{\infty,t,i} = 0, use upper part of bracket on p. 175 DK (2012) for w_{t,i}
-            ws.K0_Finf .= ws.uK0./Finf
-            a .+= v .* ws.K0_Finf
-            # Pstar     = Pstar + K0*(K0_Finf'*(Fstar/Finf)) - K1*K0_Finf' - K0_Finf*K1'
-            ger!( Fstar/Finf, ws.uK0, ws.K0_Finf, Pstar)
-            ger!( -1.0, ws.uK1, ws.K0_Finf, Pstar)
-            ger!( -1.0, ws.K0_Finf, ws.uK1, Pstar)
-            # Pinf      = Pinf - K0*K0_Finf'
-            ger!(-1.0, ws.uK0, ws.K0_Finf, Pinf)
-            llik += log(Finf)
-        elseif Fstar > kalman_tol
-            llik += log(Fstar) + v*v/Fstar
-            a .+= ws.uK1.*(v/Fstar)
-            ger!(-1/Fstar, ws.uK1, ws.uK1, Pstar)
-        else
-            # do nothing as a_{t,i+1}=a_{t,i} and P_{t,i+1}=P_{t,i}, see
-            # p. 157, DK (2012)
-        end
-    end
-    mul!(ws.PTmp, T, Pinf)
-    mul!(Pinf, ws.PTmp, transpose(T))
-    mul!(ws.PTmp, T, Pstar)
-    copy!(Pstar, QQ)
-    mul!(Pstar, ws.PTmp, transpose(T), 1.0, 1.0)
-    mul!(ws.a1, T, a)
-    a .= ws.a1
-    return llik + 2*logdetcholH
-end
-
-function univariate_step!(Y, c, t, Z, H, d, T, RQR, a, P, kalman_tol, ws)
-    ny = size(Y,1)
-    if !isdiag(H)
-        error("singular F with non-diagonal H matrix not yet supported")
-        transformed_measurement!(ws.ystar, ws.Zstar, view(Y, :, t), Z, ws.cholH)
-        H = I(ny)
-	logdetcholH = 0.0
-    else
-        copy!(ws.ystar, view(Y, :, t))
-        copy!(ws.Zstar, Z)
-        logdetcholH = logproddiag(H)
     end
     llik = 0.0
     for i=1:ny
@@ -224,7 +111,7 @@ function univariate_step!(Y, c, t, Z, H, d, T, RQR, a, P, kalman_tol, ws)
         v = get_v!(ws.ystar, c, ws.Zstar, a, i)
         F = get_F(Zi, P, H[i,i], ws.PZi)
         if abs(F) > kalman_tol
-            a .+= d[i] + (v/F) .* ws.PZi
+            a .+= d + (v/F) .* ws.PZi
             # P = P - PZi*PZi'/F
             ger!(-1.0/F, ws.PZi, ws.PZi, P)
             llik += log(F) + v*v/F
@@ -236,21 +123,51 @@ function univariate_step!(Y, c, t, Z, H, d, T, RQR, a, P, kalman_tol, ws)
     mul!(ws.PTmp, T, P)
     copy!(P, RQR)
     mul!(P, ws.PTmp, T', 1.0, 1.0)
-    return llik + 2*logdetcholH
+    return llik
 end
 
-
-function univariate_step!(att, a1, Ptt, P1, Y, t, c, Z, H, d, T, RQR, a, P, kalman_tol, ws, pattern)
+function univariate_step!(Y, t, c, Z, H, d, T, RQR, a, P, kalman_tol, ws, pattern)
     ny = size(Y,1)
     if !isdiag(H)
         error("singular F with non-diagonal H matrix not yet supported")
         transformed_measurement!(ws.ystar, ws.Zstar, view(Y, :, t), Z, ws.cholH)
         H = I(ny)
-	logdetcholH = 0.0
     else
         copy!(ws.ystar, view(Y, :, t))
         copy!(ws.Zstar, Z)
-        logdetcholH = logproddiag(H)
+    end
+    llik = 0.0
+    ndata = length(pattern)
+    for i=1:ndata
+        Zi = view(ws.Zstar, pattern[i], :)
+        v = get_v!(ws.ystar, c, ws.Zstar, a, pattern[i])
+        F = get_F(Zi, P, H[i,i], ws.PZi)
+        if abs(F) > kalman_tol
+            a .+= d + (v/F) .* ws.PZi
+            # P = P - PZi*PZi'/F
+            ger!(-1.0/F, ws.PZi, ws.PZi, P)
+            llik += log(F) + v*v/F
+        end
+    end
+    copy!(ws.a1, d)
+    mul!(ws.a1, T, a, 1.0, 1.0)
+    a .= ws.a1
+    mul!(ws.PTmp, T, P)
+    copy!(P, RQR)
+    mul!(P, ws.PTmp, T', 1.0, 1.0)
+    return llik
+end
+
+function extended_univariate_step!(att, a1, Ptt, P1, Y, t, c, Z, H, d, T, RQR, a, P, kalman_tol, ws, pattern)
+    ny = size(Y,1)
+    if !isdiag(H)
+        error("singular F with non-diagonal H matrix not yet supported")
+        transformed_measurement!(ws.ystar, ws.Zstar, view(Y, :, t), Z, ws.cholH)
+        H = I(ny)
+    else
+        @show Y
+        copy!(ws.ystar, view(Y, :, t))
+        copy!(ws.Zstar, Z)
     end
     llik = 0.0
     ndata = length(pattern)
@@ -272,29 +189,80 @@ function univariate_step!(att, a1, Ptt, P1, Y, t, c, Z, H, d, T, RQR, a, P, kalm
     mul!(ws.PTmp, T, Ptt)
     copy!(P1, RQR)
     mul!(P1, ws.PTmp, T', 1.0, 1.0)
-    return llik + 2*logproddiag(H)
+    return llik
 end
 
-function univariate_step(Y, t, c, Z, H, d, T, RQR, a, Pinf, Pstar, diffuse_kalman_tol, kalman_tol, ws)
+function diffuse_univariate_step!(Y, t, Z, H, T, RQR, a, Pinf, Pstar, diffuse_kalman_tol, kalman_tol, ws)
     ny = size(Y,1)
     if !isdiag(H)
         error("singular F with non-diagonal H matrix not yet supported")
         transformed_measurement!(ws.ystar, ws.Zstar, view(Y, :, t), Z, ws.cholH)
         H = I(ny)
-	logdetcholH = 0.0
     else
         copy!(ws.ystar, view(Y, :, t))
         copy!(ws.Zstar, Z)
-        logdetcholH = logproddiag(H)
     end
     llik = 0.0
-    for i=1:size(Y,1)
+    for i in axes(Y,1)
         Zi = view(Z, i, :)
-        uK0 = view(ws.K0, i, :, t)
-        uK1 = view(ws.K, i, :, t)
-        ws.v[i] = get_v!(ws.ystar, c, ws.Zstar, a, i)
-        Fstar = get_Fstar!(Zi, Pstar, H[i], uK1)
-        Finf = get_Finf!(Zi, Pinf, uK0)
+        v = get_v!(ws.ystar, ws.Zstar, a, i)
+        Fstar = get_Fstar!(Zi, Pstar, H[i, i], ws.uK1)
+        Finf = get_Finf!(Zi, Pinf, ws.uK0)
+        @show ws.uK0
+        # Conduct check of rank
+        # Pinf and Finf are always scaled such that their norm=1: Fstar/Pstar, instead,
+        # depends on the actual values of std errors in the model and can be badly scaled.
+        # experience is that diffuse_kalman_tol has to be bigger than kalman_tol, to ensure
+        # exiting the diffuse filter properly, avoiding tests that provide false non-zero rank for Pinf.
+        # Also the test for singularity is better set coarser for Finf than for Fstar for the same reason
+        @show Finf
+        if Finf > diffuse_kalman_tol                 # F_{\infty,t,i} = 0, use upper part of bracket on p. 175 DK (2012) for w_{t,i}
+            ws.K0_Finf .= ws.uK0./Finf
+            @show v.*ws.K0_Finf
+            a .+= v.*ws.K0_Finf
+            # Pstar     = Pstar + K0*(K0_Finf'*(Fstar/Finf)) - K1*K0_Finf' - K0_Finf*K1'
+            ger!( Fstar/Finf, ws.uK0, ws.K0_Finf, Pstar)
+            ger!( -1.0, ws.uK1, ws.K0_Finf, Pstar)
+            ger!( -1.0, ws.K0_Finf, ws.uK1, Pstar)
+            # Pinf      = Pinf - K0*K0_Finf'
+            ger!(-1.0, ws.uK0, ws.K0_Finf, Pinf)
+            llik += log(Finf) + log(Fstar) + v^2/Fstar
+        elseif Fstar > kalman_tol
+            llik += log(Fstar) + v*v/Fstar
+            a .+= ws.uK1.*(v/Fstar)
+            ger!(-1/Fstar, ws.uK1, ws.uK1, Pstar)
+        else
+            # do nothing as a_{t,i+1}=a_{t,i} and P_{t,i+1}=P_{t,i}, see
+            # p. 157, DK (2012)
+        end
+    end
+    mul!(ws.a1, T, a)
+    a .= ws.a1
+    mul!(ws.PTmp, T, Pinf)
+    mul!(Pinf, ws.PTmp, transpose(T))
+    mul!(ws.PTmp, T, Pstar)
+    copy!(Pstar, RQR)
+    mul!(Pstar, ws.PTmp, transpose(T), 1.0, 1.0)
+    return llik
+end
+
+function diffuse_univariate_step!(Y, t, Z, H, T, RQR, a, Pinf, Pstar, diffuse_kalman_tol, kalman_tol, ws, pattern)
+    ny = size(Y,1)
+    if !isdiag(H)
+        error("singular F with non-diagonal H matrix not yet supported")
+        transformed_measurement!(ws.ystar, ws.Zstar, view(Y, :, t), Z, ws.cholH)
+        H = I(ny)
+    else
+        copy!(ws.ystar, view(Y, :, t))
+        copy!(ws.Zstar, Z)
+    end
+    llik = 0.0
+    ndata = length(pattern)
+    for i=1:ndata
+        Zi = view(ws.Zstar, pattern[i], :)
+        v = get_v!(ws.ystar, ws.Zstar, a, pattern[i])
+        Fstar = get_Fstar!(Zi, Pstar, H[i], ws.uK1)
+        Finf = get_Finf!(Zi, Pinf, ws.uK0)
         # Conduct check of rank
         # Pinf and Finf are always scaled such that their norm=1: Fstar/Pstar, instead,
         # depends on the actual values of std errors in the model and can be badly scaled.
@@ -302,63 +270,56 @@ function univariate_step(Y, t, c, Z, H, d, T, RQR, a, Pinf, Pstar, diffuse_kalma
         # exiting the diffuse filter properly, avoiding tests that provide false non-zero rank for Pinf.
         # Also the test for singularity is better set coarser for Finf than for Fstar for the same reason
         if Finf > diffuse_kalman_tol                 # F_{\infty,t,i} = 0, use upper part of bracket on p. 175 DK (2012) for w_{t,i}
-            ws.K0_Finf .= uK0./Finf
-            a .+= ws.v[i]*ws.K0_Finf
+            ws.K0_Finf .= ws.uK0 ./ Finf
+          #  @show v
+          #  @show ws.K0_Finf
+            a .+= v .* ws.K0_Finf
             # Pstar     = Pstar + K0*(K0_Finf'*(Fstar/Finf)) - K1*K0_Finf' - K0_Finf*K1'
-            ger!( Fstar/Finf, uK0, ws.K0_Finf, Pstar)
-            ger!( -1.0, uK1, ws.K0_Finf, Pstar)
-            ger!( -1.0, ws.K0_Finf, uK1, Pstar)
+            ger!( Fstar/Finf, ws.uK0, ws.K0_Finf, Pstar)
+            ger!( -1.0, ws.uK1, ws.K0_Finf, Pstar)
+            ger!( -1.0, ws.K0_Finf, ws.uK1, Pstar)
             # Pinf      = Pinf - K0*K0_Finf'
-            ger!(-1.0, uK0, ws.K0_Finf, Pinf)
-            llik += log(Finf)
+            ger!(-1.0, ws.uK0, ws.K0_Finf, Pinf)
+            llik += log(Finf) + log(Fstar) + v*v/Fstar
         elseif Fstar > kalman_tol
-            llik += log(Fstar) + ws.v[i]*ws.v[i]/Fstar
-            a .+= uK1.*(ws.v[i]/Fstar)
-            ger!(-1/Fstar, uK1, uK1, Pstar)
+            llik += log(Fstar) + v*v/Fstar
+            a .+= ws.uK1.*(v/Fstar)
+            ger!(-1/Fstar, ws.uK1, ws.uK1, Pstar)
         else
             # do nothing as a_{t,i+1}=a_{t,i} and P_{t,i+1}=P_{t,i}, see
             # p. 157, DK (2012)
         end
-        ws.F[i, i, t] = Finf
-        ws.Fstar[i, i, t] = Fstar
     end
-    copy!(ws.a1, d)
-    mul!(ws.a1, T, a, 1.0, 1.0)
-    a .= ws.a1
     mul!(ws.PTmp, T, Pinf)
-    mul!(Pinf, ws.PTmp, T')
+    mul!(Pinf, ws.PTmp, transpose(T))
     mul!(ws.PTmp, T, Pstar)
     copy!(Pstar, RQR)
-    mul!(Pstar, ws.PTmp, T', 1.0, 1.0)
-    return llik + 2*logdetcholH
+    mul!(Pstar, ws.PTmp, transpose(T), 1.0, 1.0)
+    mul!(ws.a1, T, a)
+    a .= ws.a1
+    return llik
 end
 
-function univariate_step(att, a1, Pinftt, Pinf1, Pstartt, Pstar1, Y, t, c, Z, H, d, T, QQ, a, Pinf, Pstar, diffuse_kalman_tol, kalman_tol, ws, pattern)
-    copy!(a1, a)
-    copy!(Pinftt, Pinf)
-    copy!(Pstartt, Pstar)
+function extended_diffuse_univariate_step!(att, a1, Pinftt, Pinf1, Pstartt, Pstar1, Y, t, c, Z, H, d, T, RQR, a, Pinf, Pstar, diffuse_kalman_tol, kalman_tol, ws, pattern)
     ny = size(Y,1)
-    ndata = length(pattern)
-    vystar = view(ws.ystar, 1:ndata)
-    vZstar = view(ws.Zstar, 1:ndata, :)
-    @views fill!(ws.F[:, :, t], 0.0)
-    @views fill!(ws.Fstar[:, :, t], 0.0)
     if !isdiag(H)
         error("singular F with non-diagonal H matrix not yet supported")
         transformed_measurement!(ws.ystar, vZstar, view(Y, :, t), Z, ws.cholH)
         H = I(ny)
-	logdetcholH = 0.0
-    else
-        copy!(vystar, view(Y, pattern, t))
-        copy!(vZstar, Z)
-        logdetcholH = logproddiag(H)
+	else
+        copy!(ws.ystar, view(Y, :, t))
+        copy!(ws.Zstar, Z)
     end
     llik = 0.0
+    ndata = length(pattern)
+    copy!(att, a)
+    copy!(Pinftt, Pinf)
+    copy!(Pstartt, Pstar)
     for i=1:ndata
-        vZPinf = view(ws.ZP, i, :)
-        vZPstar = view(ws.ZPstar, i, :)
-        Zi = Vector(view(vZstar, i, :))
-        v = get_v!(vystar, c, vZstar, a, i)    
+        Zi = view(ws.Zstar, pattern[i], :)
+        v = get_v!(ws.ystar, c, ws.Zstar, att, pattern[i])    
+        vZPinf = view(ws.ZP, pattern[i], :)
+        vZPstar = view(ws.ZPstar, pattern[i], :)
         Fstar = get_Fstar!(Zi, Pstartt, H[i], vZPstar)
         Finf = get_Finf!(Zi, Pinftt, vZPinf)
         K0 = view(ws.K0, i, :, t)
@@ -375,13 +336,13 @@ function univariate_step(att, a1, Pinftt, Pinf1, Pstartt, Pstar1, Y, t, c, Z, H,
                                                      #w_{t,i}
             K0 .= vZPinf ./ Finf
             K1 .= (vZPstar .- (Fstar/Finf) .* vZPinf) ./ Finf
-            att .+=  v .* K0
+            att .+=  v .* K0 
             # Pstar     = Pstar - K0*ZPstar´ - K1*ZPinf'_
             ger!( -1.0, K0, vZPstar, Pstartt)
             ger!( -1.0, K1, vZPinf, Pstartt)
             # Pinf      = Pinf - K0*ZPinf´
             ger!(-1.0, K0, vZPinf, Pinftt)
-            llik += log(Finf)
+            llik += log(Finf) + log(Fstar) + v*v/Fstar
         elseif Fstar > kalman_tol
             K1 .= vZPstar ./ Fstar
             K0 .= K1
@@ -401,9 +362,9 @@ function univariate_step(att, a1, Pinftt, Pinf1, Pstartt, Pstar1, Y, t, c, Z, H,
     mul!(ws.PTmp, T, Pinftt)
     mul!(Pinf1, ws.PTmp, transpose(T))
     mul!(ws.PTmp, T, Pstartt)
-    copy!(Pstar1, QQ)
+    copy!(Pstar1, RQR)
     mul!(Pstar1, ws.PTmp, transpose(T), 1.0, 1.0)
-    return llik + 2*logdetcholH
+    return llik
 end
 
 function univariate_diffuse_smoother_step!(T::AbstractMatrix{W},
@@ -423,12 +384,12 @@ function univariate_diffuse_smoother_step!(T::AbstractMatrix{W},
                                            Pinf::AbstractArray{U},
                                            Pstar::AbstractArray{U},
                                            tol::W,
-                                           ws::DiffuseKalmanSmootherWs) where {W <: AbstractFloat,
-                                                                               U <: Real}
+                                           ws::DiffuseKalmanSmootherWs) where {W <: AbstractFloat,  U <: Real}
     ny = size(Finf, 1)
     ns = size(L0, 1)
     CHECK0 = zeros(ns)
     CHECK1 = zeros(ns)
+    @show Finf
     for i = ny: -1: 1
         vZPinf = view(ws.ZP, i, :)
         vZPstar = view(ws.ZPstar, i, :)
@@ -440,6 +401,7 @@ function univariate_diffuse_smoother_step!(T::AbstractMatrix{W},
             # get_L0!(L0, K0, Z, Finf, i) 
             copy!(L0, I(ns))
             ger!(-1.0, vK0, vZ, L0)
+            display(L0)
             i == 1 && @show norm(transpose(vZ)*Pinf*transpose(L0))
             # get_L1!(L1, K0, K1, Finf, Fstar, Z, i)  
             fill!(L1, 0.0)
@@ -508,8 +470,7 @@ function univariate_diffuse_smoother_step!(T::AbstractMatrix{W},
             mul!(N0, ws.PTmp, L0)
             ger!(iFstar, vZ, vZ, N0)
         end
-    end    #=
-    =#
+    end   
 end
             
 function univariate_diffuse_smoother_step!(T::AbstractMatrix{W},
