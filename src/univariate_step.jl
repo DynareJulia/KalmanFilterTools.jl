@@ -208,6 +208,8 @@ function diffuse_univariate_step!(Y, t, Z, H, T, RQR, a, Pinf, Pstar, diffuse_ka
         v = get_v!(ws.ystar, ws.Zstar, a, i)
         Fstar = get_Fstar!(Zi, Pstar, H[i, i], ws.uK1)
         Finf = get_Finf!(Zi, Pinf, ws.uK0)
+        ws.F[i, i] = Finf
+        ws.Fstar[i, i] = Fstar
         @show ws.uK0
         # Conduct check of rank
         # Pinf and Finf are always scaled such that their norm=1: Fstar/Pstar, instead,
@@ -389,7 +391,7 @@ function univariate_diffuse_smoother_step!(T::AbstractMatrix{W},
     ns = size(L0, 1)
     CHECK0 = zeros(ns)
     CHECK1 = zeros(ns)
-    @show Finf
+    @show "show Finf", Finf
     for i = ny: -1: 1
         vZPinf = view(ws.ZP, i, :)
         vZPstar = view(ws.ZPstar, i, :)
