@@ -222,15 +222,11 @@ info !=0 && error("F is near singular")
     local vPstartt_m = similar(vP)
     local vPinf_u = similar(vP)
     local vPstar_u = similar(vP)
-    @show size(vZsmall)
-    @show size(vPinf)
     vZPinf = vZsmall*vPinf
     vZPstar = vZsmall*vPstar
     vFstar = copy(vZPstar*vZsmall')
     vK0 = similar(ws_d.K)
     vK1 = similar(ws_d.K) 
-    @show vF
-    @show vcholF
     lik_m = ndata*l2pi + log(KalmanFilterTools.det_from_cholesky(vcholF)) + log(det(vFstar)) + vv'*inv(vFstar)*vv
     KalmanFilterTools.get_updated_Finfnonnull!(vatt_m,
                                             vPinftt_m,
@@ -264,7 +260,6 @@ info !=0 && error("F is near singular")
     () -> KalmanFilterTools.diffuse_univariate_step!(Y, t, vZsmall, vH, T, ws_d.QQ, a_u, vPinf_u, vPstar_u, diffuse_kalman_tol, kalman_tol, ws_d, pattern) 
     ]
     for (i, us) in enumerate(u_step)
-        @show "Specification $i"
         copy!(a_u, va)
         copy!(vPinf_u, vP)
         copy!(vPstar_u, vP)
@@ -394,16 +389,13 @@ Finf = copy(Finf0)
 Fstar0 = Z*pstar0*Z' + H
 Fstar = copy(Fstar0)
 
-K00 = pinf0*Z'*inv(Finf0)
-K0 = copy(K00)
-K0 = pstar0*Z'*inv(Finf0) - pinf0*Z'*inv(Finf0)*Fstar0*inv(Finf0) 
+K0 = pinf0*Z'*inv(Finf0)
+K1 = pstar0*Z'*inv(Finf0) - pinf0*Z'*inv(Finf0)*Fstar0*inv(Finf0) 
 K = copy(K0)
 
-L0_target = I(ns) - K00*Z
-L1_target = -K0*Z
+L0_target = I(ns) - K0*Z
+L1_target = -K1*Z
 r1_target = Z'inv(Finf)*v + L0_target'*r1 +L1_target'*r0
-display(r0)
-display(L0_target')
 r0_target = L0_target'*r0
 N0_target = L0_target'*N0*L0_target
 N1_target = Z'*inv(Finf)*Z + L0_target'*N1*L0_target + L1_target'*N0_target*L0_target
@@ -425,8 +417,6 @@ pinf, pstar, tol, ws_d)
 @test N2 ≈ N2_target
 =#
 @test r0 ≈ r0_target
-@test r0 ≈ transpose(T)*r0_target
-@test r1 ≈ transpose(T)*r1_target
+@test r1 ≈ r1_target
 
-@test Z'inv(Finf)*ws_d.v[:,1] ≈ (I(ns) - ws_d.K0[1, :, 1]*transpose(Z[1, :])/ws_d.F[1,1,1])*Z[2,:]*ws_d.v[2,1]/ws_d.F[2,2,1] + Z[1,:]*ws_d.v[1,1]/ws_d.F[1,1,1]
 

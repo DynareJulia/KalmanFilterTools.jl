@@ -165,7 +165,6 @@ function extended_univariate_step!(att, a1, Ptt, P1, Y, t, c, Z, H, d, T, RQR, a
         transformed_measurement!(ws.ystar, ws.Zstar, view(Y, :, t), Z, ws.cholH)
         H = I(ny)
     else
-        @show Y
         copy!(ws.ystar, view(Y, :, t))
         copy!(ws.Zstar, Z)
     end
@@ -206,33 +205,33 @@ function diffuse_univariate_step!(Y, t, Z, H, T, RQR, a, Pinf, Pstar, diffuse_ka
     for i in axes(Y,1)
         Zi = view(Z, i, :)
         v = get_v!(ws.ystar, ws.Zstar, a, i)
-        Fstar = get_Fstar!(Zi, Pstar, H[i, i], ws.uK1)
-        Finf = get_Finf!(Zi, Pinf, ws.uK0)
+        ws.v[i] = v
+        K0 = view(ws.K0, i, :, t)
+        K1 = view(ws.K, i, :, t)
+        Fstar = get_Fstar!(Zi, Pstar, H[i, i], K1)
+        Finf = get_Finf!(Zi, Pinf, K0)
         ws.F[i, i] = Finf
         ws.Fstar[i, i] = Fstar
-        @show ws.uK0
         # Conduct check of rank
         # Pinf and Finf are always scaled such that their norm=1: Fstar/Pstar, instead,
         # depends on the actual values of std errors in the model and can be badly scaled.
         # experience is that diffuse_kalman_tol has to be bigger than kalman_tol, to ensure
         # exiting the diffuse filter properly, avoiding tests that provide false non-zero rank for Pinf.
         # Also the test for singularity is better set coarser for Finf than for Fstar for the same reason
-        @show Finf
         if Finf > diffuse_kalman_tol                 # F_{\infty,t,i} = 0, use upper part of bracket on p. 175 DK (2012) for w_{t,i}
-            ws.K0_Finf .= ws.uK0./Finf
-            @show v.*ws.K0_Finf
+            ws.K0_Finf .= K0./Finf
             a .+= v.*ws.K0_Finf
             # Pstar     = Pstar + K0*(K0_Finf'*(Fstar/Finf)) - K1*K0_Finf' - K0_Finf*K1'
-            ger!( Fstar/Finf, ws.uK0, ws.K0_Finf, Pstar)
-            ger!( -1.0, ws.uK1, ws.K0_Finf, Pstar)
-            ger!( -1.0, ws.K0_Finf, ws.uK1, Pstar)
+            ger!( Fstar/Finf, K0, ws.K0_Finf, Pstar)
+            ger!( -1.0, K1, ws.K0_Finf, Pstar)
+            ger!( -1.0, ws.K0_Finf, K1, Pstar)
             # Pinf      = Pinf - K0*K0_Finf'
-            ger!(-1.0, ws.uK0, ws.K0_Finf, Pinf)
+            ger!(-1.0, K0, ws.K0_Finf, Pinf)
             llik += log(Finf) + log(Fstar) + v^2/Fstar
         elseif Fstar > kalman_tol
             llik += log(Fstar) + v*v/Fstar
-            a .+= ws.uK1.*(v/Fstar)
-            ger!(-1/Fstar, ws.uK1, ws.uK1, Pstar)
+            a .+= K1.*(v/Fstar)
+            ger!(-1/Fstar, K1, K1, Pstar)
         else
             # do nothing as a_{t,i+1}=a_{t,i} and P_{t,i+1}=P_{t,i}, see
             # p. 157, DK (2012)
@@ -262,9 +261,12 @@ function diffuse_univariate_step!(Y, t, Z, H, T, RQR, a, Pinf, Pstar, diffuse_ka
     ndata = length(pattern)
     for i=1:ndata
         Zi = view(ws.Zstar, pattern[i], :)
+        K0 = view(ws.K0, i, :)
+        K1 = view(ws.K, i, :)
         v = get_v!(ws.ystar, ws.Zstar, a, pattern[i])
-        Fstar = get_Fstar!(Zi, Pstar, H[i], ws.uK1)
-        Finf = get_Finf!(Zi, Pinf, ws.uK0)
+        ws.v[i] = v
+        Fstar = get_Fstar!(Zi, Pstar, H[i], K1)
+        Finf = get_Finf!(Zi, Pinf, K0)
         # Conduct check of rank
         # Pinf and Finf are always scaled such that their norm=1: Fstar/Pstar, instead,
         # depends on the actual values of std errors in the model and can be badly scaled.
@@ -272,21 +274,19 @@ function diffuse_univariate_step!(Y, t, Z, H, T, RQR, a, Pinf, Pstar, diffuse_ka
         # exiting the diffuse filter properly, avoiding tests that provide false non-zero rank for Pinf.
         # Also the test for singularity is better set coarser for Finf than for Fstar for the same reason
         if Finf > diffuse_kalman_tol                 # F_{\infty,t,i} = 0, use upper part of bracket on p. 175 DK (2012) for w_{t,i}
-            ws.K0_Finf .= ws.uK0 ./ Finf
-          #  @show v
-          #  @show ws.K0_Finf
+            ws.K0_Finf .= K0 ./ Finf
             a .+= v .* ws.K0_Finf
             # Pstar     = Pstar + K0*(K0_Finf'*(Fstar/Finf)) - K1*K0_Finf' - K0_Finf*K1'
-            ger!( Fstar/Finf, ws.uK0, ws.K0_Finf, Pstar)
-            ger!( -1.0, ws.uK1, ws.K0_Finf, Pstar)
-            ger!( -1.0, ws.K0_Finf, ws.uK1, Pstar)
+            ger!( Fstar/Finf, K0, ws.K0_Finf, Pstar)
+            ger!( -1.0, K1, ws.K0_Finf, Pstar)
+            ger!( -1.0, ws.K0_Finf, K1, Pstar)
             # Pinf      = Pinf - K0*K0_Finf'
-            ger!(-1.0, ws.uK0, ws.K0_Finf, Pinf)
+            ger!(-1.0, K0, ws.K0_Finf, Pinf)
             llik += log(Finf) + log(Fstar) + v*v/Fstar
         elseif Fstar > kalman_tol
             llik += log(Fstar) + v*v/Fstar
-            a .+= ws.uK1.*(v/Fstar)
-            ger!(-1/Fstar, ws.uK1, ws.uK1, Pstar)
+            a .+= K1.*(v/Fstar)
+            ger!(-1/Fstar, K1, K1, Pstar)
         else
             # do nothing as a_{t,i+1}=a_{t,i} and P_{t,i+1}=P_{t,i}, see
             # p. 157, DK (2012)
@@ -319,13 +319,13 @@ function extended_diffuse_univariate_step!(att, a1, Pinftt, Pinf1, Pstartt, Psta
     copy!(Pstartt, Pstar)
     for i=1:ndata
         Zi = view(ws.Zstar, pattern[i], :)
+        K0 = view(ws.K0, i, :)
+        K1 = view(ws.K, i, :)
         v = get_v!(ws.ystar, c, ws.Zstar, att, pattern[i])    
         vZPinf = view(ws.ZP, pattern[i], :)
         vZPstar = view(ws.ZPstar, pattern[i], :)
         Fstar = get_Fstar!(Zi, Pstartt, H[i], vZPstar)
         Finf = get_Finf!(Zi, Pinftt, vZPinf)
-        K0 = view(ws.K0, i, :, t)
-        K1 = view(ws.K, i, :, t)
     
         # Conduct check of rank
         # Pinf and Finf are always scaled such that their norm=1: Fstar/Pstar, instead,
@@ -389,9 +389,6 @@ function univariate_diffuse_smoother_step!(T::AbstractMatrix{W},
                                            ws::DiffuseKalmanSmootherWs) where {W <: AbstractFloat,  U <: Real}
     ny = size(Finf, 1)
     ns = size(L0, 1)
-    CHECK0 = zeros(ns)
-    CHECK1 = zeros(ns)
-    @show "show Finf", Finf
     for i = ny: -1: 1
         vZPinf = view(ws.ZP, i, :)
         vZPstar = view(ws.ZPstar, i, :)
@@ -403,30 +400,17 @@ function univariate_diffuse_smoother_step!(T::AbstractMatrix{W},
             # get_L0!(L0, K0, Z, Finf, i) 
             copy!(L0, I(ns))
             ger!(-1.0, vK0, vZ, L0)
-            display(L0)
-            i == 1 && @show norm(transpose(vZ)*Pinf*transpose(L0))
             # get_L1!(L1, K0, K1, Finf, Fstar, Z, i)  
             fill!(L1, 0.0)
             ger!(-1.0, vK1, vZ, L1)
-            @show norm(L1 + vK1*transpose(vZ))
-            if i == 1
-                @show norm(vK1' - (vZ'*Pstar/Finf[i,i]- vZ'*Pinf*Fstar[i,i]/Finf[i,i]^2))
-                @show norm(L1 + ((vZ'*Pstar/Finf[i,i]) - (vZ'Pinf*Fstar[i,i]/Finf[i,i]^2))'*vZ')
-                @show norm(transpose(L1) + vZ*((vZ'*Pstar/Finf[i,i]) - (vZ'Pinf*Fstar[i,i]/Finf[i,i]^2)))
-                @show norm(vZ'*Pinf*transpose(L1) + vZ'*Pinf*vZ*(vZ'*Pstar/Finf[i,i] - (Fstar[i,i]/Finf[i,i]^2)*vZ'*Pinf))
-                @show norm(vZ'*Pinf*transpose(L1) + (vZ'*Pstar - (Fstar[i,i]/Finf[i,i])*vZ'*Pinf))
-                @show norm(vZ'Pstar*transpose(L0) - (vZ'*Pstar - (Fstar[i,i]/Finf[i,i])*vZ'Pinf))
-                @show norm(vZ'*Pinf*transpose(L1) + vZ'Pstar*transpose(L0))
-            end
-             # compute r1_{t,i-1} first because it depends
+            # compute r1_{t,i-1} first because it depends
             # upon r0{t,i} 
             # update_r1!(r1, r0, Z, v, Finv, L0, L1, i)
             copy!(ws.tmp_ns, vZ)
             rmul!(ws.tmp_ns, v[i]*iFinf)
-            CHECK1 = ws.tmp_ns + L0'*CHECK1
-            @show Z[i:end,:]*Pinf*CHECK1
             mul!(ws.tmp_ns, transpose(L1), r0, 1.0, 1.0)
-            mul!(r1, transpose(L0), r1, 1.0, 1.0)
+            mul!(ws.tmp_ns, transpose(L0), r1, 1.0, 1.0)
+            copy!(r1, ws.tmp_ns)
             #  r0(:,t) = Linf'*r0(:,t);   % KD (2000), eq. (25) for r_0
             copy!(ws.tmp_ns, r0)
             mul!(r0, transpose(L0), ws.tmp_ns)
@@ -463,8 +447,6 @@ function univariate_diffuse_smoother_step!(T::AbstractMatrix{W},
             #  r0(:,t) = Linf'*r0(:,t)
             copy!(ws.tmp_ns, vZ)
             rmul!(ws.tmp_ns, v[i]*iFstar)
-            CHECK1 = L0'*CHECK0 + L1'*CHECK1 
-            CHECK0 =     ws.tmp_ns + L0'*CHECK0
             mul!(ws.tmp_ns, transpose(L0), r0, 1.0, 1.0)
             copy!(r0, ws.tmp_ns)
             # update_N0!(N0, L1, ws.PTmp)
