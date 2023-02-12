@@ -27,6 +27,8 @@ Our in place algorithm
   P_{t+1} &= T_tP_{t|t}T_t + R_tQ_tR_t' 
 \end{align*}
 
+\section{Univariate basic filter step}
+
 \section{Diffuse filter}
 In Durbin and Koopmans (2012)
 \begin{align*}
@@ -98,7 +100,7 @@ When $F^{-1}_{\infty,t}$ is regular
 When $F^{-1}_{\infty,t} = \mathbf{0}$
 \begin{align*}
   \tilde K_{\star,t} &= F^{-1}_{\star,t}(ZP_{\star,t})\\
-  a_{t|t} &= a_t + K'_{\star,t}\nu^{(0)}_t\\
+  a_{t|t} &= a_t + \tilde K'_{\star,t}\nu^{(0)}_t\\
   P_{\infty,t|t} &= P_{\infty,t} \\
   P_{\star,t|t} &= P_{\star,t} - \tilde K_{\infty,t}'ZP_{\star,t}\\
   a^{(0)}_{t+1} &= d_t + T_ta_{t|t}\\
@@ -106,6 +108,7 @@ When $F^{-1}_{\infty,t} = \mathbf{0}$
   P_{\star, t+1} &= T_tP_{\star,t|t}T'_t + R_tQ_tR_t' 
 \end{align*}
 
+\section{Univariate diffuse filter step}
 \section{Basic smoother}
 \begin{align*}
   L_t &= T_t - K_tZ_t & \mbox{(DK2012 p. 87)}\\
@@ -134,6 +137,34 @@ In place basic smoother
   (V\epsilon)_t &= H_t - H_tD_tH_t \\
   \hat \eta_t &= Q_tR'_tr_t \\
   (V\eta)_t &= Q_t - Q_tR'_tN_tR_tQ_t \\
+\end{align*}
+
+\section{Univariate smoother step}
+Initialization
+\begin{align*}
+  r_{t, p_t} &= r_t \\
+  N_{t,p_t} &= N_t
+\end{align*}
+For $i = p_{t-1},\ldots,0$, if $|F_{t,i}| > 0$,
+\begin{align*}
+  r_{t-1,i-1} &= Z'_{t,i}F^{-1}_{t,i}\nu_{t,i} + L'_{t,i}r_{t,i} & \mbox{(DK2012 6.15)}\\
+  N_{t-1,i-1} &= Z'_{t,i}F^{-1}_{t,i}Z_{t,i} + L'_{t,i}N_{t,i}L_{t,i} & \mbox{(DK2012 6.15)}\\
+  \hat\epsilon_{t,i} & \sigma^2_{t,i}F^{-1}_{t,i}(\nu_{t,i} -
+                       K'_{t,i}r_{t,i} & \mbox{(DK2012 p. 157)}\\
+  \mbox{Var}(\hat\epsilon_{t,i}) &= \sigma^4_{t,i}F^{-2}_{t,i}(F_{t,i}
+                                   + K'_{t,i}N_{t,i}K_{t,i}) & \mbox{(DK2012 p. 157)} 
+\end{align*}
+if $F_{t,i} = 0$
+\begin{align*}
+  r_{t-1,i-1} &= r_{t,i} \\
+  N_{t-1,i-1} &= N_{t,i}
+\end{align*}
+and
+\begin{align*}
+  r_{t-1,p_{t-1}} &= T'_{t-1}r_{t,0} & \mbox{(DK2012 6.15)}\\
+  N_{t-1,p_{t-1}} &= T'_{t-1}N_{t,0}T_{t-1}  & \mbox{(DK2012 6.15)}\\
+  r_{t-1} &= r_{t-1, p_{t-1}}\\
+  N_{t-1} &= N_{t-1, p_{t-1}}
 \end{align*}
 
 \section{Diffuse smoother}
@@ -197,34 +228,6 @@ In place diffuse smoother
   \mbox{Var}(\eta_t|Y_n) &= Q_t - Q_tR'_tN^{(0)}_tR_tQ_t \\
 \end{align*}
 
-\section{Univariate smoother step}
-Initialization
-\begin{align*}
-  r_{t, p_t} &= r_t \\
-  N_{t,p_t} &= N_t
-\end{align*}
-For $i = p_{t-1},\ldots,0$, if $|F_{t,i}| > 0$,
-\begin{align*}
-  r_{t-1,i-1} &= Z'_{t,i}F^{-1}_{t,i}\nu_{t,i} + L'_{t,i}r_{t,i} & \mbox{(DK2012 6.15)}\\
-  N_{t-1,i-1} &= Z'_{t,i}F^{-1}_{t,i}Z_{t,i} + L'_{t,i}N_{t,i}L_{t,i} & \mbox{(DK2012 6.15)}\\
-  \hat\epsilon_{t,i} & \sigma^2_{t,i}F^{-1}_{t,i}(\nu_{t,i} -
-                       K'_{t,i}r_{t,i} & \mbox{(DK2012 p. 157)}\\
-  \mbox{Var}(\hat\epsilon_{t,i}) &= \sigma^4_{t,i}F^{-2}_{t,i}(F_{t,i}
-                                   + K'_{t,i}N_{t,i}K_{t,i}) & \mbox{(DK2012 p. 157)} 
-\end{align*}
-if $F_{t,i} = 0$
-\begin{align*}
-  r_{t-1,i-1} &= r_{t,i} \\
-  N_{t-1,i-1} &= N_{t,i}
-\end{align*}
-and
-\begin{align*}
-  r_{t-1,p_{t-1}} &= T'_{t-1}r_{t,0} & \mbox{(DK2012 6.15)}\\
-  N_{t-1,p_{t-1}} &= T'_{t-1}N_{t,0}T_{t-1}  & \mbox{(DK2012 6.15)}\\
-  r_{t-1} &= r_{t-1, p_{t-1}}\\
-  N_{t-1} &= N_{t-1, p_{t-1}}
-\end{align*}
-
 \section{Univariate diffuse smoother step}
 Initialization
 \begin{align*}
@@ -234,6 +237,7 @@ Initialization
 
 For $i = p_{t-1},\ldots,0$, if $|F_{t,i}| > 0$,
 \begin{align*}
+  
   r0_{t-1,i-1} &= L'_{\infty,i}r0_{t,i} \\
   r1_{t-1,i-1} &= Z'_{t,i}F^{-1}_{t,i}\nu_{t,i} +
                  L'_{\infty,t,i}r0_{t,i} + L'_{0,t,i}r1_{t,i} \\
@@ -249,8 +253,11 @@ For $i = p_{t-1},\ldots,0$, if $|F_{t,i}| > 0$,
 
 if $F_{t,i} = 0$
 \begin{align*}
-  r_{t-1,i-1} &= r_{t,i} \\
-  N_{t-1,i-1} &= N_{t,i}
+  r0_{t-1,i-1} &= Z'_{t,i}F^{-1}_{t-1}\nu_{t,i} + L_{\star, t, i}'r0_{t,i} \\
+  r1_{t-1,i-i} &= r1_{t,i}\\
+  N^{(0)}_{t-1,i-1} &= Z'_{t,i}F^{-1}_{t-1}Z_{t,i} + L_{\star, t, i}'N^{(0)}_{t,i}L_{\star, t, i}\\
+  N^{(1)}_{t-1,i-1} &= N^{(1)}_{t,i}L_{\star, t, i}\\
+  N^{(2)}_{t-1,i-1} &= N^{(2)}_{t,i}L_{\star, t, i}
 \end{align*}
 
 and

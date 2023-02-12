@@ -265,6 +265,7 @@ info !=0 && error("F is near singular")
         copy!(vPstar_u, vP)
         copy!(ws_d.v[:, 1], vv)
         lik_u = ndata*l2pi + us()
+        @show i
         @test vPinf_u ≈ T*vPinftt_m*T'
         @test ws_d.QQ ≈ RQR
         @test vPstar_u ≈ T*vPstartt_m*T' + RQR

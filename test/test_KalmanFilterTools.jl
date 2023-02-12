@@ -345,7 +345,7 @@ end
     kalman_filter!(y, cs, Zs, Hs, ds, Ts, Rs, Qs, ss, stt, Ps, Ptt, 1, nobs1, 0, ws1, full_data_pattern)
     @test ss[:, 2] ≈ s
     @test Ps[:, :, 2] ≈ P
-#=
+
     ws2 = KalmanSmootherWs{Float64, Int64}(ny, ns, np, nobs)
     ss1 = zeros(ns, nobs+1)
     ss1[:, 1] = s_0
@@ -368,7 +368,7 @@ end
     end
     kalman_smoother!(y, cs, Zs, Hs, ds, Ts, Rs, Qs, ss1, stt, Ps1, Ptt, alphah, epsilonh, etah, Valpha, Vepsilon, Veta, 1, nobs, 0, ws2, full_data_pattern)
     @test y ≈ view(alphah, [4, 3, 2], :)
-=#
+
 end
 
 # Replication data computed with Dynare

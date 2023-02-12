@@ -198,7 +198,7 @@ function kalman_filter!(Y::AbstractArray{X},
                 get_cholF!(vcholH, vvH)
                 cholHset = true
             end
-            ws.lik[t] = ndata*l2pi + univariate_step!(att=vatt, a1=va1, Ptt=vPtt, P1=vP1, Y=Y, t=t, c=c, Z=ws.Zsmall, H=vvH, d=d, T=T, RQR=ws.QQ, a=va, P=vP, kalman_tol=ws.kalman_tol, ws=ws, pattern=pattern)
+            ws.lik[t] = ndata*l2pi + extended_univariate_step!(vatt, va1, vPtt, vP1, Y, t, c, ws.Zsmall, vvH, d, T, ws.QQ, va, vP, ws.kalman_tol, ws, pattern)
             t += 1
             continue
         end 
@@ -401,7 +401,7 @@ function diffuse_kalman_filter_init!(Y::AbstractArray{X},
                     get_cholF!(vcholH, vvH)
                     cholHset = true
                 end
-                ws.lik[t] += ndata*l2pi + univariate_step(vatt, va1, vPinftt, vPinf1, vPstartt, vPstar1, Y, t, vc, vZsmall, vvH, vd, vT, ws.QQ, va, vPinf, vPstar, diffuse_kalman_tol, kalman_tol, ws, pattern)
+                ws.lik[t] += ndata*l2pi + extended_diffuse_univariate_step!(vatt, va1, vPinftt, vPinf1, vPstartt, vPstar1, Y, t, vc, vZsmall, vvH, vd, vT, ws.QQ, va, vPinf, vPstar, diffuse_kalman_tol, kalman_tol, ws, pattern)
                 
                 if norm(vPinf1) < tol
                     return t

@@ -367,7 +367,7 @@ function diffuse_kalman_smoother_coda!(Y::AbstractArray{V},
                                        presample::X,
                                        ws::DiffuseKalmanSmootherWs,
                                        data_pattern::Vector{Vector{X}}) where {U <: AbstractFloat, V <: Union{AbstractFloat, Missing}, W <: Real, X <: Integer}
-
+@show last
     changeC = ndims(c) > 1
     changeH = ndims(H) > 2
     changeD = ndims(d) > 1
@@ -395,7 +395,7 @@ function diffuse_kalman_smoother_coda!(Y::AbstractArray{V},
     N2 = ws.N2
     N2_1 = ws.N2_1
 
-    fill!(r0_1, 0.0)
+    #fill!(r0_1, 0.0)
     fill!(r1_1, 0.0)
 
     ny = size(Y, 1)
@@ -438,14 +438,12 @@ function diffuse_kalman_smoother_coda!(Y::AbstractArray{V},
                 univariate_diffuse_smoother_step!(vT, vFinf, vFstar,
                                                   vK0, vK,
                                                   L0, L1, N0, N1, N2,
-                                                  r0, r1, vv, vZsmall, vPinf, vPstar,
+                                                  r0, r1, r0_1, r1_1, vv, vZsmall, vPinf, vPstar,
                                                   ws.kalman_tol, ws)
-                @show vZsmall*(vPstar*r0 + vPinf*r1)
-                @show vv
             else
                 univariate_diffuse_smoother_step!(vT, vFinf, vFstar,
                                                   vK0, vK,
-                                                  L0, L1, r0, r1, vv,
+                                                  L0, L1, r0, r1, r0_1, r1_1, vv,
                                                   vZsmall, ws.kalman_tol,
                                                   ws)
             end
