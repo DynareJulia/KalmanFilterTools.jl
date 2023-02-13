@@ -380,6 +380,8 @@ pstar0 = copy(Pstar[:, :, 1])
 pstar = copy(pstar0)
 QQ = R*Q*R'
 KalmanFilterTools.diffuse_univariate_step!(y, t, Z, H, T, QQ, a, pinf, pstar, 1e-10, 1e-10, ws_d)
+@show ws_d.K0[:, :, 1]
+@show ws_d.K[:, :, 1]
 v = y - c - Z*a0
 K0 = T*pinf0*Z'*inv(Z*pinf0*Z')
 a1 = T*a0 + K0*v
@@ -396,8 +398,8 @@ K = copy(K0)
 
 L0_target = I(ns) - K0*Z
 L1_target = -K1*Z
-r1_target = Z'inv(Finf)*v + L0_target'*r1 +L1_target'*r0
-r0_target = L0_target'*r0
+r1_target = Z'inv(Finf)*v + L0_target'*r1_1 +L1_target'*r0_1
+r0_target = L0_target'*r0_1
 N0_target = L0_target'*N0*L0_target
 N1_target = Z'*inv(Finf)*Z + L0_target'*N1*L0_target + L1_target'*N0_target*L0_target
 Fstar = -inv(Finf)*Fstar*inv(Finf)
@@ -407,7 +409,7 @@ tol = 1e-12
 KalmanFilterTools.univariate_diffuse_smoother_step!(T, ws_d.F[:, :, 1], ws_d.Fstar[:, :, 1],
 ws_d.K0[:, :, 1], ws_d.K[:, :, 1],
 ws_d.L, ws_d.L1, ws_d.N, ws_d.N1,
-ws_d.N2, r0, r1, ws_d.v[:,1], Z,
+ws_d.N2, r0, r1, r0_1, r1_1, ws_d.v[:,1], Z,
 pinf, pstar, tol, ws_d)
 
 #=
