@@ -374,18 +374,28 @@ y = Y[:, 1]
 t = 1
 a0 = copy(aa[:, 1])
 a = copy(a0)
+a1 = similar(a)
+att = similar(a)
 pinf0 = copy(Pinf[:, :, 1])
 pinf = copy(pinf0)
+pinftt = similar(pinf0)
+pinf1 = similar(pinf0)
 pstar0 = copy(Pstar[:, :, 1])
 pstar = copy(pstar0)
+pstartt = similar(pstar)
+pstar1 = similar(pstar)
 QQ = R*Q*R'
-KalmanFilterTools.diffuse_univariate_step!(y, t, Z, H, T, QQ, a, pinf, pstar, 1e-10, 1e-10, ws_d)
+pattern = [1, 2]
+c = zeros(ny)
+d = zeros(ns)
+#KalmanFilterTools.diffuse_univariate_step!(y, t, Z, H, T, QQ, a, pinf, pstar, 1e-10, 1e-10, ws_d)
+KalmanFilterTools.extended_diffuse_univariate_step!(att, a1, pinftt, pinf1, pstartt, pstar1, y, t, c, Z, H, d, T, QQ, a, pinf, pstar, diffuse_kalman_tol, kalman_tol, ws_d, pattern)
 @show ws_d.K0[:, :, 1]
 @show ws_d.K[:, :, 1]
 v = y - c - Z*a0
 K0 = T*pinf0*Z'*inv(Z*pinf0*Z')
-a1 = T*a0 + K0*v
-@test a ≈ a1
+a_target = T*a0 + K0*v
+@test a1 ≈ a_target
 
 Finf0 = Z*pinf0*Z'
 Finf = copy(Finf0)
@@ -412,13 +422,11 @@ ws_d.L, ws_d.L1, ws_d.N, ws_d.N1,
 ws_d.N2, r0, r1, r0_1, r1_1, ws_d.v[:,1], Z,
 pinf, pstar, tol, ws_d)
 
-#=
-@test L0 ≈ L0_target
-@test L1 ≈ L1_target
-@test N0 ≈ N0_target
-@test N1 ≈ N1_target
-@test N2 ≈ N2_target
-=#
+#@test ws_d.L ≈ L0_target
+#@test ws_d.L1 ≈ L1_target
+@test ws_d.N ≈ N0_target
+@test ws_d.N1 ≈ N1_target
+@test ws_d.N2 ≈ N2_target
 @test r0 ≈ r0_target
 @test r1 ≈ r1_target
 

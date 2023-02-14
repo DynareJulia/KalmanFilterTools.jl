@@ -366,11 +366,17 @@ function extended_diffuse_univariate_step!(att, a1, Pinftt, Pinf1, Pstartt, Psta
             # do nothing as a_{t,i+1}=a_{t,i} and P_{t,i+1}=P_{t,i}, see
             # p. 157, DK (2012)
         end
+        @show K0
+        @show K1
         ws.v[i] = v
         ws.F[i, i, t] = Finf
         ws.Fstar[i, i, t] = Fstar
     end
+    @show a1
+    @show d
     copy!(a1, d)
+    @show size(T)
+    @show att
     mul!(a1, T, att, 1.0, 1.0)
     mul!(ws.PTmp, T, Pinftt)
     mul!(Pinf1, ws.PTmp, transpose(T))
