@@ -367,7 +367,6 @@ function diffuse_kalman_smoother_coda!(Y::AbstractArray{V},
                                        presample::X,
                                        ws::DiffuseKalmanSmootherWs,
                                        data_pattern::Vector{Vector{X}}) where {U <: AbstractFloat, V <: Union{AbstractFloat, Missing}, W <: Real, X <: Integer}
-@show last
     changeC = ndims(c) > 1
     changeH = ndims(H) > 2
     changeD = ndims(d) > 1
@@ -416,7 +415,7 @@ function diffuse_kalman_smoother_coda!(Y::AbstractArray{V},
         vPstartt = changePstartt ? view(Pstartt, :, :, t) : view(Pstartt, :, :)
         vQ = changeQ ? view(Q, :, :, t) : view(Q, :, :)
         vR = changeR ? view(R, :, :, t) : view(R, :, :)
-        vv = view(ws.v, : ,t)
+        vv = view(ws.v, 1:ndata ,t)
         vK = view(ws.K, 1:ndata, :, t)
         vK0 = view(ws.K0, 1:ndata, :, t)
         vKDK0 = view(ws.KDK0, :, 1:ndata) # amounts to K_t (5.12): here KDK0 = T*K0'
@@ -532,17 +531,18 @@ function diffuse_kalman_smoother_coda!(Y::AbstractArray{V},
             end
 
             if length(epsilonh) > 0
-                vepsilonh = view(epsilonh, :, t)
+                vepsilonh = view(epsilonh, 1:ndata, t)
                 # epsilon_t = -H_t*KDK0*r0_t         (DK p. 135)
-                get_epsilonh!(vepsilonh, vH, vKDK0, r0_1, ws.tmp_ny)
+                @views get_epsilonh!(vepsilonh, vH, vKDK0, r0_1, ws.tmp_ny[1:ndata])
                 if length(Vepsilon) > 0
-                    vVepsilon = view(Vepsilon,:,:,t)
-                    vTmp = view(ws.tmp_ny_ns, 1:ndata, :) 
+                    vVepsilon = view(Vepsilon, 1:ndata, 1:ndata,t)
+                    vTmp = view(ws.tmp_ny_ns, 1:ndata, :)
+                    vD = view(ws.D, 1:ndata, 1:ndata) 
                     # D_t = KDK0_t'*N0_t*KDK0_t    (DK p. 135)
-                    get_D!(ws.D, vKDK,  N0_1, vTmp)
+                    @views get_D!(vD, vKDK,  N0_1, vTmp)
                     # Vepsilon_t = H - H*D_t*H         (DK p. 135)
                     vTmp = view(ws.tmp_ny_ny, 1:ndata, 1:ndata)
-                    get_Vepsilon!(vVepsilon, vH, ws.D, ws.tmp_ny_ny)
+                    get_Vepsilon!(vVepsilon, vH, vD, vTmp)
                 end
             end
             if length(etah) > 0
@@ -605,16 +605,13 @@ function diffuse_kalman_smoother!(Y::AbstractArray{X},
                                   presample::V,
                                   tol::U,
                                   ws::KalmanWs,
-                                  data_pattern::Vector{Vector{V}}) where {U <: AbstractFloat,
-                                                                          V <: Integer,
-                                                                          W <: Real,
-                                                                          X <: Union{AbstractFloat, Missing}}
+                                  data_pattern::Vector{Vector{V}}) where {U <: AbstractFloat, V <: Integer, W <: Real, X <: Union{AbstractFloat, Missing}}
     ny = size(Y,1)
     nobs = last - start + 1
     t = diffuse_kalman_filter_init!(Y, c, Z, H, d, T, R, Q, a, att,
                                     Pinf, Pinftt, Pstar, Pstartt,
                                     start, last, presample, tol, ws,
-                                    data_pattern)
+                                    data_pattern)    
     kalman_smoother!(Y, c, Z, H, d, T, R, Q, a, att, Pstar, Pstartt,
                      alphah, epsilonh, etah, Valphah, Vepsilonh,
                      Vetah, t + 1, last, presample, ws, data_pattern)
