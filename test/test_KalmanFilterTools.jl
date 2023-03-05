@@ -182,7 +182,6 @@ end
     HHH = Z_1*P_0*Z_1' + H_1
     Z_1[1,1] += sqrt(0.1/P_0[1,1])
     H_1 = HHH - Z_1*P_0*Z_1'
-    @show det(HHH)
     @test det(Z_1*P_0*Z_1' + H_1) < 1e-10
 
     ws1 = KalmanLikelihoodWs(ny, ns, np, nobs)
@@ -199,31 +198,15 @@ end
     # v  = Y[:,t] - Z*a
     iy = 1
     KalmanFilterTools.get_v!(ws1.v, y, Z_2, s[:,1], iy, ny)
-    @show ws1.v
     # F  = Z*P*Z' + H
     KalmanFilterTools.get_F!(ws1.F, ws1.ZP, Z_2, P[:,:,1], H)
     FF = copy(ws1.F)
     HH = copy(H)
     info = KalmanFilterTools.get_cholF!(ws1.cholF, FF)
-    @show info
-    @show HH
-    @show ws1.v
     KalmanFilterTools.get_cholF!(ws1.cholH, H)
-    @show ws1.cholF
-    @show ws1.cholH
     UTcholH = UpperTriangular(ws1.cholH)
     H3 = copy(H)
-    @show UTcholH' \ H3 / UTcholH
-    @show KalmanFilterTools.univariate_step!(y, 1, Z_2, HH, T, ws1.QQ, s[:,1], P[:,:,1], ws1.kalman_tol, ws1)
-    @show ws1.v
     KalmanFilterTools.get_iFv!(ws1.iFv, ws1.cholF, ws1.v)
-    @show det(ws1.F)
-    @show inv(ws1.F)
-    @show ws1.iFv
-    @show log(KalmanFilterTools.det_from_cholesky(ws1.cholF))
-    @show LinearAlgebra.dot(ws1.v, ws1.iFv)
-    @show log(KalmanFilterTools.det_from_cholesky(ws1.cholF)) + LinearAlgebra.dot(ws1.v, ws1.iFv)
-
     t_init!(H, P, s, H_1, P_0, s_0)
     llk_1 = kalman_filter!(y, zeros(ny), Z_1, H, zeros(ns), T, R, Q, s, stt, P, Ptt, 1, nobs, 0, ws2, full_data_pattern)
 

@@ -201,7 +201,7 @@ function kalman_smoother!(Y::AbstractArray{V},
             valphah = view(alphah, :, t)
             # alphah_t = a_t + P_t*r_{t-1} (DK 4.44)
             get_alphah!(valphah, va, vP, ws.r)
-    end
+        end
 
         if length(Valpha) > 0
             vValpha = view(Valpha, :, :, t)
@@ -385,6 +385,7 @@ function diffuse_kalman_smoother_coda!(Y::AbstractArray{V},
     r0_1 = ws.r_1
     r1 = ws.r1
     r1_1 = ws.r1_1
+    fill!(r1_1, 0.0)
     L0 = ws.L
     L1 = ws.L1
     N0 = ws.N
@@ -393,9 +394,6 @@ function diffuse_kalman_smoother_coda!(Y::AbstractArray{V},
     N1_1 = ws.N1_1
     N2 = ws.N2
     N2_1 = ws.N2_1
-
-    #fill!(r0_1, 0.0)
-    fill!(r1_1, 0.0)
 
     ny = size(Y, 1)
     for t = last: -1: start
@@ -424,16 +422,16 @@ function diffuse_kalman_smoother_coda!(Y::AbstractArray{V},
         vcholF = view(ws.cholF, 1:ndata, 1:ndata, t)
         viFv = view(ws.iFv, 1:ndata, t)
 
-        mul!(vKDK0, vT, transpose(vK0))
-        mul!(vKDK, vT, transpose(vK))
         if isnan(vcholF[1])
             vFinf =view(ws.F, 1:ndata, 1:ndata, t)
             vFstar =view(ws.Fstar, 1:ndata, 1:ndata, t)
+            if t == last
+                copy!(ws.tmp_ns, r0_1)
+                mul!(r0_1, transpose(T), ws.tmp_ns)
+            end
             if (length(Valpha) > 0 ||
                 length(Vepsilon) > 0 ||
                 length(Veta) > 0)
-                r00 = copy(r0)
-                r11 = copy(r1)
                 univariate_diffuse_smoother_step!(vT, vFinf, vFstar,
                                                   vK0, vK,
                                                   L0, L1, N0, N1, N2,
@@ -448,15 +446,15 @@ function diffuse_kalman_smoother_coda!(Y::AbstractArray{V},
             end
             if length(epsilonh) > 0
                 vepsilonh = view(epsilonh, pattern, t)
-                # epsilon_t = -H_t*KDK0*r0_t         (DK p. 135)
+                # epsilon_t = -H_t*K0*r0_t         (DK p. 135)
                 vtmp1 = view(ws.tmp_ny, 1:ndata)
-                get_epsilonh!(vepsilonh, vH, vKDK0, r0_1, vtmp1)
+                get_epsilonh!(vepsilonh, vH, transpose(vK0), r0_1, vtmp1)
                 if length(Vepsilon) > 0
                     vVepsilon = view(Vepsilon, pattern, pattern,t)
                     vTmp = view(ws.tmp_ny_ns, 1:ndata, :) 
-                    # D_t = KDK0_t'*N0_t*KDK0_t    (DK p. 135)
+                    # D_t = K0_t'*N0_t*K0_t    (DK p. 135)
                     vD = view(ws.D, 1:ndata, 1:ndata)
-                    get_D!(vD, vKDK,  N0_1, vTmp)
+                    get_D!(vD, transpose(vK),  N0_1, vTmp)
                     # Vepsilon_t = H - H*D_t*H         (DK p. 135)
                     vTmp = view(ws.tmp_ny_ny, 1:ndata, 1:ndata)
                     get_Vepsilon!(vVepsilon, vH, vD, vTmp)
@@ -488,14 +486,16 @@ function diffuse_kalman_smoother_coda!(Y::AbstractArray{V},
                 get_Valpha!(vValpha, vPstar, vPinf,
                             N0, N1, N2, ws.PTmp)
             end
-            mul!(r0_1, transpose(T), r0)
-            mul!(r1_1, transpose(T), r1)
-            mul!(ws.PTmp, transpose(T), N0)
-            mul!(N0_1, ws.PTmp, T)
-            mul!(ws.PTmp, transpose(T), N1)
-            mul!(N1_1, ws.PTmp, T)
-            mul!(ws.PTmp, transpose(T), N2)
-            mul!(N2_1, ws.PTmp, T)
+            if t > start
+                mul!(r0_1, transpose(vT), r0)
+                mul!(r1_1, transpose(vT), r1)
+                mul!(ws.PTmp, transpose(vT), N0)
+                mul!(N0_1, ws.PTmp, vT)
+                mul!(ws.PTmp, transpose(vT), N1)
+                mul!(N1_1, ws.PTmp, vT)
+                mul!(ws.PTmp, transpose(vT), N2)
+                mul!(N2_1, ws.PTmp, vT)
+            end 
         else
             if isnan(vcholF[1])
                 @views viFv .= qr(ws.F[:,:,t], Val(true))\vv
@@ -503,6 +503,8 @@ function diffuse_kalman_smoother_coda!(Y::AbstractArray{V},
                 # iFv = Finf \ v
                 get_iFv!(viFv, vcholF, vv)
             end 
+            mul!(vKDK0, vT, transpose(vK0))
+            mul!(vKDK, vT, transpose(vK))
             # L0_t = T - KDK0*Z (DK 5.12)
             get_L!(L0, vT, vKDK0, vZsmall)
             # L1_t = - KDK*Z (DK 5.12)

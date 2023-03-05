@@ -401,6 +401,7 @@ function univariate_diffuse_smoother_step!(T::AbstractMatrix{W},
                                            ws::DiffuseKalmanSmootherWs) where {W <: AbstractFloat,  U <: Real}
     ny = size(Finf, 1)
     ns = size(L0, 1)
+    LL = I(ns)
     for i = ny: -1: 1
         vZPinf = view(ws.ZP, i, :)
         vZPstar = view(ws.ZPstar, i, :)
@@ -444,17 +445,15 @@ function univariate_diffuse_smoother_step!(T::AbstractMatrix{W},
             mul!(N0, ws.PTmp, L0)
         elseif Fstar[i, i] > tol
             iFstar = 1/Fstar[i, i]
-            # get_L0!(L0, K1, Z, Fstar, i)
-            copy!(ws.tmp_ns_ns, I(ns))
-            ger!(-1.0, vK0, vZ, ws.tmp_ns_ns)
             # get_L1!(L1, K0, K1, Finf, Fstar, Z, i)  
-            fill!(L1, 0.0)
+            copy!(L1, I(ns))
             ger!(-1.0, vK1, vZ, L1)
-            #  r0(:,t) = Linf'*r0(:,t)
+            #  r0(:,t) = Z'_t*iFinf)t*v_t  + Linf'*r0(:,t)
             copy!(ws.tmp_ns, vZ)
             rmul!(ws.tmp_ns, v[i]*iFstar)
-            mul!(ws.tmp_ns, transpose(L0), r0_1, 1.0, 1.0)
+            mul!(ws.tmp_ns, transpose(L1), r0_1, 1.0, 1.0)
             copy!(r0, ws.tmp_ns)
+            copy!(r1, r1_1)
             # update_N0!(N0, L1, ws.PTmp)
             mul!(ws.PTmp, transpose(L1), N0)
             mul!(N0, ws.PTmp, L0)
@@ -462,7 +461,7 @@ function univariate_diffuse_smoother_step!(T::AbstractMatrix{W},
         end
         copy!(r0_1, r0)
         copy!(r1_1, r1)
-    end   
+    end 
 end
             
 function univariate_diffuse_smoother_step!(T::AbstractMatrix{W},

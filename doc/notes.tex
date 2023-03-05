@@ -1,3 +1,4 @@
+
 \documentclass{article}
 \usepackage{amsmath}
 
@@ -28,6 +29,36 @@ Our in place algorithm
 \end{align*}
 
 \section{Univariate basic filter step}
+In Durbin and Koopmans (2012), section 6.4.2
+\begin{align*}
+  \nu_{t,i} &= y_{t,i} - Z_{t,i}a_{t,i}\\
+  F_{t,i} &= Z_{t,i}P_{t,i}Z_{t.i}' & \mbox{DK2012 6.13}\\
+  K_{t,i} &= P_{t,i}Z_{t,i}'F_{t,i}^{-1} \\
+  a_{t,i+1] &= a_{t,i} + K_{t,i}\nu_{t,i} \mbox{DK2012 6.12}\\
+  P_{t,i+1} &= P_{t,i} - K_{t,i}P_{t,i}K_{t,i}'
+\end{align*}
+for $i=1,\ldots,p_t$
+\begin{align*}
+  a_{t,t} &= a_{t,p+1}\\
+  a_{t+1,1} &= T a_{t|t} & \mbox{DK2012 6.14}\\
+  P_{t|t} &= P_{t,p+1}\\
+  P_{t+1} &= TP_{t|t}T'  + RQR'
+                                     
+\end{align*}
+Our in place algorithm, for $i=1,\ldots,p$
+\begin{align*}
+  \nu_{t,i} &= y_{t,i} - Z_{t,i}a_{t,i}\\
+  ZP_{t,i} &= Z_{t,i}P_{t,i}
+  F_{t,i} &= ZP_{t,i}Z_{t.i}' \\
+  K_{t,i} &= ZP_{t,i}'F_{t,i}^{-1} \\
+  a_{t,i+1] &= a_{t,i} + K_{t,i}'\nu_{t,i}\\
+  P_{t,i+1} &= P_{t,i} - K_{t,i}'P_{t,i}K_{t,i}
+  a_{t,t} &= a_{t,p+1}\\
+  a_{t+1,1} &= T a_{t|t} & \mbox{DK2012 6.14}\\
+  P_{t|t} &= P_{t,p+1}\\
+  P_{t+1} &= TP_{t|t}T'  + RQR'
+                                     
+\end{align*}
 
 \section{Diffuse filter}
 In Durbin and Koopmans (2012)
@@ -198,6 +229,8 @@ and
                                                            \mbox{(DK2012
                                                            p.135)}\\
 \end{align*}
+for periods $t=d,\ldots,1$ and with initializaton $r^{(0)}_d =  r_t$, $r^{(1)}_d =  0$,
+$N^{(0)}_d = N_d$ and $N^{(1)} = N^{(2)} = 0$.
 
 In place diffuse smoother
 \begin{align*}
@@ -231,12 +264,17 @@ In place diffuse smoother
 \section{Univariate diffuse smoother step}
 Initialization
 \begin{align*}
-  r_{t, p_t} &= r_t \\
-  N_{t,p_t} &= N_t
+  r^{(0)}_{d-1, p_d} &= T_{d-1}'r_d \\
+  r^{(0)}_{d-1, p_d} &= 0 \\
+  N^{(0)}_{d-1,p_d} &= T_{d-1}'N_dT_{d-1}\\
+  N^{(1)}_{d-1,p_d} &= 0\\
+  N^{(2)}_{d=1,p_d} &= 0\\
 \end{align*}
 
-For $i = p_{t-1},\ldots,0$, if $|F_{t,i}| > 0$,
+For $i = p_{t},\ldots,1$, if $|F_{t,i}| > 0$,
 \begin{align*}  
+  L0 &= I - \tilde K_{\infty,t}Z_t \\
+  L &= - K_tZ_t \\
   r0_{t-1,i-1} &= L'_{\infty,i}r0_{t,i} \\
   r1_{t-1,i-1} &= Z'_{t,i}F^{-1}_{t,i}\nu_{t,i} +
                  L'_{\infty,t,i}r0_{t,i} + L'_{0,t,i}r1_{t,i} \\
@@ -252,6 +290,7 @@ For $i = p_{t-1},\ldots,0$, if $|F_{t,i}| > 0$,
 
 if $F_{t,i} = 0$
 \begin{align*}
+  L_{\star, t, i} &= I - \tilde K_{\star, t, i}Z_t \\
   r0_{t-1,i-1} &= Z'_{t,i}F^{-1}_{t-1}\nu_{t,i} + L_{\star, t, i}'r0_{t,i} \\
   r1_{t-1,i-i} &= r1_{t,i}\\
   N^{(0)}_{t-1,i-1} &= Z'_{t,i}F^{-1}_{t-1}Z_{t,i} + L_{\star, t, i}'N^{(0)}_{t,i}L_{\star, t, i}\\
@@ -272,7 +311,7 @@ For $i = p_{t-1},\ldots,0$, if $|F_{t,i}| > 0$,
 \begin{align*}
   r0_{t-1,i-1} &= L0'_{t,i}r0_{t,i} \\
   r1_{t-1,i-1} &= Z'_{t,i}F^{-1}_{t,i}\nu_{t,i} +
-                 L0'_{t,i}r0_{t,i} + L1'_{t,i}r1_{t,i} \\
+                 L1'_{t,i}r0_{t,i} + L0'_{t,i}r1_{t,i} \\
   N^{(0)}_{t-1,i-1} &= L0'_{t,i}N^{(0)}_{t,i}L0_{t,i}\\
   N^{(1)}_{t-1,i-1} &= Z'_{t,i}F^{(1)}_{t,i}Z_{t,i} + L'_{\infty,t,i}N^{(0)}L_t
                   +L_{\infty,t,i}N^{(1)}L_{0,t,i}

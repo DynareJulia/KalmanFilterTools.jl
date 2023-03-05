@@ -375,7 +375,7 @@ function diffuse_kalman_filter_init!(Y::AbstractArray{X},
         # Finf = Z*Pinf*Z'
         get_F!(vFinf, vZPinf, vZsmall, vPinf)
         info = get_cholF!(vcholF, vFinf)
-        if info > 0 || rcond(vFinf) < ws.kalman_tol
+        if info > 0 || rcond(vFinf) < ws.kalman_tol || norm(vFinf) < tol
             if norm(vFinf) < tol
                 get_updated_Finfnull2!(vatt,
                                        vPinftt,
@@ -433,6 +433,7 @@ function diffuse_kalman_filter_init!(Y::AbstractArray{X},
         # a1 = d + T*att                                                  (5.13) DK(2012) 
         update_a!(va1, vd, vT, vatt)
         # Pinf = T*Pinftt*T'
+
         update_P!(vPinf1, vT, vPinftt, ws.PTmp)
         # Pstar = T*Pstartt*T' + QQ
         update_P!(vPstar1, vT, vPstartt, ws.QQ, ws.PTmp)
