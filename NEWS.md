@@ -1,3 +1,7 @@
+0.1.4
+=====
+- fixing univariate diffuse smoother
+
 0.1.3
 =====
 - fixing bugs in diffuse filter
