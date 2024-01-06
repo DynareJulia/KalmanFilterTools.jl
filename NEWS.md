@@ -1,3 +1,7 @@
+0.1.5
+=====
+- add error for stochastic singularity
+
 0.1.4
 =====
 - fixing univariate diffuse smoother
