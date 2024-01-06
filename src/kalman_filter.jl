@@ -147,6 +147,7 @@ function kalman_filter!(Y::AbstractArray{X},
     vP = view(P, :, :, 1)
     copy!(ws.oldP, vP)
     cholHset = false
+    Falwayssingular = true
     while t <= last
         pattern = data_pattern[t]
         ndata = length(pattern)
@@ -194,6 +195,7 @@ function kalman_filter!(Y::AbstractArray{X},
         info = get_cholF!(vcholF, vF)
         if rcond(vcholF) < ws.kalman_tol || info != 0
             # F is near singular
+            #=
             if !cholHset
                 get_cholF!(vcholH, vvH)
                 cholHset = true
@@ -201,6 +203,9 @@ function kalman_filter!(Y::AbstractArray{X},
             ws.lik[t] = ndata*l2pi + extended_univariate_step!(vatt, va1, vPtt, vP1, Y, t, c, ws.Zsmall, vvH, d, T, ws.QQ, va, vP, ws.kalman_tol, ws, pattern)
             t += 1
             continue
+            =#
+        else
+            Falwayssingular = false
         end 
         # iFv = inv(F)*v
         get_iFv!(viFv, vcholF, vv)
@@ -213,6 +218,9 @@ function kalman_filter!(Y::AbstractArray{X},
             copy!(vPtt, vPtt_1)
         end
         t += 1
+    end
+    if Falwayssingular
+        error("The covariance matrix of the one-step ahead forecast error for the observed variables (F) is singular. This a case of stochastic singularity.")
     end
     vlik = view(ws.lik, start + presample:last)
     return -0.5*sum(vlik)

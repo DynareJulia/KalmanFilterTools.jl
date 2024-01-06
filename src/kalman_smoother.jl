@@ -143,6 +143,7 @@ function kalman_smoother!(Y::AbstractArray{V},
         #        ws.csmall .= view(vc, pattern)
         vZsmall = get_vZsmall(ws.Zsmall, ws.iZsmall, Z, pattern, ndata, ny, t)
         vH = changeH ? view(H, pattern, pattern, t) : view(H, pattern, pattern)
+        hasmeasurementerror = !all(vH .== 0)
         vT = changeT ? view(T, :, :, t) : view(T, :, :)
         va = changeA ? view(a, :, t) : view(a, :)
         vatt = changeAtt ? view(att, :, t) : view(att, :)
@@ -163,13 +164,13 @@ function kalman_smoother!(Y::AbstractArray{V},
         # r_{t-1} = Z_t'*iF_t*v_t + L_t'r_t (DK 4.44)
         update_r!(ws.r, vZsmall, viFv, ws.L, ws.r_1)
         if (length(alphah) > 0 ||
-            length(epsilonh) > 0 ||
+            hasmeasurementerror ||
             length(etah) > 0)
             # N_{t-1} = Z_t'iF_t*Z_t + L_t'N_t*L_t (DK 4.44)
             get_iFZ!(viFZ, vcholF, vZsmall)
             update_N!(ws.N, vZsmall, viFZ, ws.L, ws.N_1, ws.PTmp)
         end
-        if length(epsilonh) > 0
+        if hasmeasurementerror
             vepsilonh = view(epsilonh, pattern, t)
             # epsilon_t = H*(iF_t*v_t - KDK_t'*r_t) (DK 4.69)
             vtmp1 = view(ws.tmp_ny, 1:ndata)
