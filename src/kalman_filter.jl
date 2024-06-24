@@ -195,7 +195,6 @@ function kalman_filter!(Y::AbstractArray{X},
         info = get_cholF!(vcholF, vF)
         if rcond(vcholF) < ws.kalman_tol || info != 0
             # F is near singular
-            #=
             if !cholHset
                 get_cholF!(vcholH, vvH)
                 cholHset = true
@@ -203,7 +202,6 @@ function kalman_filter!(Y::AbstractArray{X},
             ws.lik[t] = ndata*l2pi + extended_univariate_step!(vatt, va1, vPtt, vP1, Y, t, c, ws.Zsmall, vvH, d, T, ws.QQ, va, vP, ws.kalman_tol, ws, pattern)
             t += 1
             continue
-            =#
         else
             Falwayssingular = false
         end 
@@ -296,7 +294,7 @@ struct DiffuseKalmanFilterWs{T, U} <: KalmanWs{T, U}
 end
 
 DiffuseKalmanFilterWs(ny, ns, np, nobs) = DiffuseKalmanFilterWs{Float64, Int64}(ny, ns, np, nobs)
-
+using SparseArrays
 function diffuse_kalman_filter_init!(Y::AbstractArray{X},
                                      c::AbstractArray{U},
                                      Z::AbstractArray{W},
@@ -410,8 +408,7 @@ function diffuse_kalman_filter_init!(Y::AbstractArray{X},
                     get_cholF!(vcholH, vvH)
                     cholHset = true
                 end
-                ws.lik[t] += ndata*l2pi + extended_diffuse_univariate_step!(vatt, va1, vPinftt, vPinf1, vPstartt, vPstar1, Y, t, vc, vZsmall, vvH, vd, vT, ws.QQ, va, vPinf, vPstar, diffuse_kalman_tol, kalman_tol, ws, pattern)
-                
+                ws.lik[t] += ndata*l2pi + extended_diffuse_univariate_step!(vatt, va1, vPinftt, vPinf1, vPstartt, vPstar1, Y, t, vc, Z, vvH, vd, vT, ws.QQ, va, vPinf, vPstar, diffuse_kalman_tol, kalman_tol, ws, pattern)
                 if norm(vPinf1) < tol
                     return t
                 else
