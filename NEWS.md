@@ -1,3 +1,7 @@
+0.1.6
+=====
+- fix filter when F is singular
+
 0.1.5
 =====
 - add error for stochastic singularity
