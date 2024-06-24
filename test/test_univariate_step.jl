@@ -265,7 +265,6 @@ info !=0 && error("F is near singular")
         copy!(vPstar_u, vP)
         copy!(ws_d.v[:, 1], vv)
         lik_u = ndata*l2pi + us()
-        @show i
         @test vPinf_u ≈ T*vPinftt_m*T'
         @test ws_d.QQ ≈ RQR
         @test vPstar_u ≈ T*vPstartt_m*T' + RQR
@@ -390,8 +389,6 @@ c = zeros(ny)
 d = zeros(ns)
 #KalmanFilterTools.diffuse_univariate_step!(y, t, Z, H, T, QQ, a, pinf, pstar, 1e-10, 1e-10, ws_d)
 KalmanFilterTools.extended_diffuse_univariate_step!(att, a1, pinftt, pinf1, pstartt, pstar1, y, t, c, Z, H, d, T, QQ, a, pinf, pstar, diffuse_kalman_tol, kalman_tol, ws_d, pattern)
-@show ws_d.K0[:, :, 1]
-@show ws_d.K[:, :, 1]
 v = y - c - Z*a0
 K0 = T*pinf0*Z'*inv(Z*pinf0*Z')
 a_target = T*a0 + K0*v

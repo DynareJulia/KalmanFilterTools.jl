@@ -654,7 +654,7 @@ end
     @test Pinftt2 ≈ Pinftt
     @test isapprox(Pstartt2, Pstartt, atol = 1e-15)
 
-    a1 = similar(a)
+    a1 = copy(a)
     K = similar(K0)
     QQ = R*Q*R'
     Ptmp = similar(Pinf)

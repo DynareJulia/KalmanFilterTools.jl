@@ -9,9 +9,11 @@ np   = 2
 nobs = 50
 
 a = randn(nobs, nobs)
-achol = cholesky(a'*a)
-d = KalmanFilterTools.det_from_cholesky(achol.U)
-@test det(a'*a) ≈ d 
+if norm(a) < 1e30
+    achol = cholesky(a'*a)
+    d = KalmanFilterTools.det_from_cholesky(achol.U)
+    @test det(a'*a) ≈ d 
+end
 
 # alphah_t = a_t + P_t*r_{t-1}
 alphah = Vector{Float64}(undef, ns)
